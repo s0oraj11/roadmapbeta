@@ -1,12 +1,8 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { motion } from 'framer-motion'
-import dynamic from 'next/dynamic'
 import { initialNodes, initialEdges } from '@/components/roadmapData'
 
-const StellarRoadmap = dynamic(() => import('@/components/StellarRoadmap'), {
-  ssr: false,
-  loading: () => <div className="text-white text-center">Loading roadmap...</div>
-})
+const StellarRoadmap = lazy(() => import('@/components/StellarRoadmap'))
 
 const Index = () => {
   return (
@@ -30,7 +26,9 @@ const Index = () => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
         >
-          <StellarRoadmap nodes={initialNodes} edges={initialEdges} />
+          <Suspense fallback={<div className="text-white text-center">Loading roadmap...</div>}>
+            <StellarRoadmap nodes={initialNodes} edges={initialEdges} />
+          </Suspense>
         </motion.div>
       </div>
     </div>
