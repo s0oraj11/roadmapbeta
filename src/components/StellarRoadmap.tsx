@@ -24,6 +24,7 @@ interface StellarRoadmapProps {
   edges: FlowEdge[]
 }
 
+// Updated StellarNode component with improved drag handling
 const StellarNode = ({ 
   node,
   position,
@@ -57,10 +58,10 @@ const StellarNode = ({
     const handleMouseMove = (event: MouseEvent) => {
       if (!dragging.current) return
 
-      const rect = event.currentTarget as HTMLElement
       const x = (event.clientX - previousPosition.current[0]) / 100
       const y = -(event.clientY - previousPosition.current[1]) / 100
 
+      // Consider camera position when calculating new position
       const newPosition: [number, number, number] = [
         position[0] + x,
         position[1] + y,
@@ -86,7 +87,7 @@ const StellarNode = ({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [position, onDrag])
+  }, [position, onDrag, camera])
   
   return (
     <group
@@ -178,6 +179,16 @@ const ConstellationEdge = ({
   )
 }
 
+const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Camera) => void }) => {
+  const { camera } = useThree()
+  
+  useEffect(() => {
+    onCameraReady(camera)
+  }, [camera, onCameraReady])
+  
+  return null
+}
+
 const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges: flowEdges }) => {
   const nodes: NodeType[] = flowNodes.map(node => ({
     id: node.id,
@@ -195,6 +206,9 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 
   const [activeNode, setActiveNode] = useState<string | null>(null)
   const controlsRef = useRef<any>()
+  const [camera, setCamera] = useState<THREE.Camera | null>(null)
+  const initialCameraPosition = useRef<THREE.Vector3 | null>(null)
+  
   const [nodePositions, setNodePositions] = useState(new Map(nodes.map(node => [
     node.id,
     [
@@ -204,19 +218,52 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     ] as [number, number, number]
   ])))
 
-  const handleNodeClick = (nodeId: string) => {
+  const handleNodeClick = useCallback((nodeId: string) => {
     setActiveNode(nodeId)
     if (controlsRef.current) {
       const position = nodePositions.get(nodeId)
       if (position) {
         controlsRef.current.target.set(...position)
+        controlsRef.current.update()
       }
     }
-  }
+  }, [nodePositions])
 
-  const handleNodeDrag = (nodeId: string, newPosition: [number, number, number]) => {
-    setNodePositions(prev => new Map(prev).set(nodeId, newPosition))
-  }
+  const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
+    setNodePositions(prev => {
+      const updated = new Map(prev)
+      updated.set(nodeId, newPosition)
+      return updated
+    })
+  }, [])
+
+  const handleZoomIn = useCallback(() => {
+    if (controlsRef.current) {
+      controlsRef.current.dollyIn(1.25)
+      controlsRef.current.update()
+    }
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    if (controlsRef.current) {
+      controlsRef.current.dollyOut(1.25)
+      controlsRef.current.update()
+    }
+  }, [])
+
+  const handleReset = useCallback(() => {
+    if (controlsRef.current && initialCameraPosition.current) {
+      controlsRef.current.reset()
+      controlsRef.current.update()
+    }
+  }, [])
+
+  const handleCameraReady = useCallback((camera: THREE.Camera) => {
+    setCamera(camera)
+    if (!initialCameraPosition.current) {
+      initialCameraPosition.current = camera.position.clone()
+    }
+  }, [])
 
   const updateMinimapPositions = useCallback(() => {
     return nodes.map(node => ({
@@ -237,7 +284,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     >
       <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
         <button
-          onClick={() => controlsRef.current?.zoomIn()}
+          onClick={handleZoomIn}
           className="p-2 hover:bg-gray-700 rounded"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
@@ -245,7 +292,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
           </svg>
         </button>
         <button
-          onClick={() => controlsRef.current?.zoomOut()}
+          onClick={handleZoomOut}
           className="p-2 hover:bg-gray-700 rounded"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
@@ -253,7 +300,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
           </svg>
         </button>
         <button
-          onClick={() => controlsRef.current?.reset()}
+          onClick={handleReset}
           className="p-2 hover:bg-gray-700 rounded"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
@@ -286,6 +333,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       </div>
 
       <Canvas>
+        <CameraController onCameraReady={handleCameraReady} />
         <color attach="background" args={['#030712']} />
         <ambientLight intensity={0.4} />
         <pointLight position={[10, 10, 10]} intensity={1} />
