@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import RoadmapFlow from '@/components/RoadmapFlow';
+import OrbitalRoadmap from '@/components/OrbitalRoadmap;
 
 const Index = () => {
   return (
@@ -24,7 +25,7 @@ const Index = () => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
         >
-          <RoadmapFlow />
+          <OrbitalRoadmap />
         </motion.div>
       </div>
     </div>
