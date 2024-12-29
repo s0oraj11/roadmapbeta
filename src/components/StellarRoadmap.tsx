@@ -181,6 +181,8 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
   const { camera } = useThree()
   
   useEffect(() => {
+    camera.position.set(30, 30, 30)
+    camera.lookAt(0, 0, 0)
     onCameraReady(camera)
   }, [camera, onCameraReady])
   
@@ -277,7 +279,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   const handleCameraReady = useCallback((camera: THREE.Camera) => {
     setCamera(camera)
     if (!initialCameraPosition.current) {
-      initialCameraPosition.current = camera.position.clone()
+      initialCameraPosition.current = new THREE.Vector3(30, 30, 30)
     }
   }, [])
 
