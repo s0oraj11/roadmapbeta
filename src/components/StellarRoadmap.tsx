@@ -181,7 +181,7 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
   const { camera } = useThree()
   
   useEffect(() => {
-    camera.position.set(30, 30, 30)
+    camera.position.set(0, 0, 15)
     camera.lookAt(0, 0, 0)
     onCameraReady(camera)
   }, [camera, onCameraReady])
@@ -212,8 +212,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   const [nodePositions, setNodePositions] = useState(new Map(nodes.map(node => [
     node.id,
     [
-      node.position.x / 50 - 8,
-      -node.position.y / 50 + 8,
+      node.position.x / 25 - 8,
+      -node.position.y / 25 + 8,
       0
     ] as [number, number, number]
   ])))
@@ -279,7 +279,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   const handleCameraReady = useCallback((camera: THREE.Camera) => {
     setCamera(camera)
     if (!initialCameraPosition.current) {
-      initialCameraPosition.current = new THREE.Vector3(0, 0, 20)
+      initialCameraPosition.current = new THREE.Vector3(0, 0, 15)
     }
   }, [])
 
@@ -351,6 +351,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       </div>
 
       <Canvas>
+        
         <CameraController onCameraReady={handleCameraReady} />
         <color attach="background" args={['#030712']} />
         <ambientLight intensity={0.4} />
