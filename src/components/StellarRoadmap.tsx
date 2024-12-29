@@ -24,7 +24,6 @@ interface StellarRoadmapProps {
   edges: FlowEdge[]
 }
 
-// Updated StellarNode component with improved drag handling
 const StellarNode = ({ 
   node,
   position,
@@ -61,7 +60,6 @@ const StellarNode = ({
       const x = (event.clientX - previousPosition.current[0]) / 100
       const y = -(event.clientY - previousPosition.current[1]) / 100
 
-      // Consider camera position when calculating new position
       const newPosition: [number, number, number] = [
         position[0] + x,
         position[1] + y,
@@ -238,25 +236,43 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   }, [])
 
   const handleZoomIn = useCallback(() => {
-    if (controlsRef.current) {
-      controlsRef.current.dollyIn(1.25)
+    if (controlsRef.current && camera) {
+      const zoomFactor = 0.75
+      const currentDistance = camera.position.distanceTo(controlsRef.current.target)
+      const newDistance = Math.max(currentDistance * zoomFactor, controlsRef.current.minDistance)
+      
+      const direction = camera.position.clone().sub(controlsRef.current.target).normalize()
+      const newPosition = controlsRef.current.target.clone().add(direction.multiplyScalar(newDistance))
+      
+      camera.position.copy(newPosition)
+      camera.updateProjectionMatrix()
       controlsRef.current.update()
     }
-  }, [])
+  }, [camera])
 
   const handleZoomOut = useCallback(() => {
-    if (controlsRef.current) {
-      controlsRef.current.dollyOut(1.25)
+    if (controlsRef.current && camera) {
+      const zoomFactor = 1.25
+      const currentDistance = camera.position.distanceTo(controlsRef.current.target)
+      const newDistance = Math.min(currentDistance * zoomFactor, controlsRef.current.maxDistance)
+      
+      const direction = camera.position.clone().sub(controlsRef.current.target).normalize()
+      const newPosition = controlsRef.current.target.clone().add(direction.multiplyScalar(newDistance))
+      
+      camera.position.copy(newPosition)
+      camera.updateProjectionMatrix()
       controlsRef.current.update()
     }
-  }, [])
+  }, [camera])
 
   const handleReset = useCallback(() => {
-    if (controlsRef.current && initialCameraPosition.current) {
-      controlsRef.current.reset()
+    if (controlsRef.current && initialCameraPosition.current && camera) {
+      camera.position.copy(initialCameraPosition.current)
+      controlsRef.current.target.set(0, 0, 0)
+      camera.updateProjectionMatrix()
       controlsRef.current.update()
     }
-  }, [])
+  }, [camera])
 
   const handleCameraReady = useCallback((camera: THREE.Camera) => {
     setCamera(camera)
@@ -363,7 +379,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
           return null
         })}
 
-        {nodes.map(node => {
+
+                                             {nodes.map(node => {
           const position = nodePositions.get(node.id)
           if (position) {
             return (
