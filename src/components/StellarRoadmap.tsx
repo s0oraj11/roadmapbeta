@@ -124,14 +124,12 @@ const ConstellationEdge = ({
     }
   })
 
-  // Calculate the direction vector
   const direction = new THREE.Vector3(
     end[0] - start[0],
     end[1] - start[1],
     end[2] - start[2]
   )
   
-  // Create points for a curved line
   const curve = new THREE.QuadraticBezierCurve3(
     new THREE.Vector3(...start),
     new THREE.Vector3(
@@ -180,7 +178,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes, edges }) => {
   }
 
   const updateMinimapPositions = useCallback(() => {
-    // Convert 3D positions back to 2D for minimap
     const minimapNodes = nodes.map(node => ({
       ...node,
       position: {
@@ -194,7 +191,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes, edges }) => {
   return (
     <DragContext.Provider value={{ isDragging, setIsDragging }}>
       <div className="relative w-full h-[800px] bg-gray-950 rounded-lg overflow-hidden">
-        {/* Fixed Controls */}
         <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
           <button
             onClick={() => controlsRef.current?.zoomIn()}
@@ -222,7 +218,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes, edges }) => {
           </button>
         </div>
 
-        {/* Fixed Minimap */}
         <div className="absolute bottom-4 right-4 z-10 w-48 h-48 bg-gray-800/80 rounded-lg border border-gray-700 p-2">
           <div className="relative w-full h-full">
             {updateMinimapPositions().map(node => (
@@ -305,3 +300,4 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes, edges }) => {
 }
 
 export default StellarRoadmap
+
