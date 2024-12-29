@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
-import OrbitalRoadmap from '@/components/OrbitalRoadmap'
 import StellarRoadmap from '@/components/StellarRoadmap'
+import { initialNodes, initialEdges } from '@/components/roadmapData'
 
 const Index = () => {
   return (
