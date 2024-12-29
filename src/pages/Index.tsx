@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import RoadmapFlow from '@/components/RoadmapFlow';
-import OrbitalRoadmap from '@/components/OrbitalRoadmap;
+import OrbitalRoadmap from '@/components/OrbitalRoadmap';
 
 const Index = () => {
   return (
