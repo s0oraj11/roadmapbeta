@@ -182,7 +182,6 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
   
   useEffect(() => {
     camera.position.set(0, 0, 15)
-    camera.lookAt(0, 0, 0)
     onCameraReady(camera)
   }, [camera, onCameraReady])
   
