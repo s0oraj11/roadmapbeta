@@ -181,7 +181,7 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
   const { camera } = useThree()
   
   useEffect(() => {
-    camera.position.set(0, 0, 25)
+    camera.position.set(0, 0, 35)
     onCameraReady(camera)
   }, [camera, onCameraReady])
   
@@ -278,7 +278,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   const handleCameraReady = useCallback((camera: THREE.Camera) => {
     setCamera(camera)
     if (!initialCameraPosition.current) {
-      initialCameraPosition.current = new THREE.Vector3(0, 0, 25)
+      initialCameraPosition.current = new THREE.Vector3(0, 0, 35)
     }
   }, [])
 
@@ -403,8 +403,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
           ref={controlsRef}
           enablePan={true}
           enableZoom={true}
-          minDistance={10}
-          maxDistance={50}
+          minDistance={20}
+          maxDistance={60}
           makeDefault
         />
       </Canvas>
