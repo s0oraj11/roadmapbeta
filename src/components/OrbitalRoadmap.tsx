@@ -1,18 +1,34 @@
-import React, { useRef, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Html } from '@react-three/drei';
-import { motion } from 'framer-motion-3d';
-import { Node, Edge } from '@xyflow/react';
+"use client"
+
+import React, { useRef, useState } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { OrbitControls, Html, Environment } from '@react-three/drei'
+import { motion } from 'framer-motion-3d'
+import { Node, Edge } from '@xyflow/react'
+
+// Sample data - you should replace this with your actual data
+const sampleNodes: Node[] = [
+  { id: '1', position: { x: 0, y: 0 }, data: { label: 'Arrays & Strings' } },
+  { id: '2', position: { x: 200, y: 0 }, data: { label: 'Linked Lists' } },
+  { id: '3', position: { x: 0, y: 200 }, data: { label: 'Trees & Graphs' } },
+  { id: '4', position: { x: 200, y: 200 }, data: { label: 'Dynamic Programming' } },
+]
+
+const sampleEdges: Edge[] = [
+  { id: 'e1-2', source: '1', target: '2' },
+  { id: 'e2-3', source: '2', target: '3' },
+  { id: 'e3-4', source: '3', target: '4' },
+]
 
 interface RoadmapNodeProps {
-  node: Node;
-  position: [number, number, number];
-  isActive: boolean;
-  onClick: () => void;
+  node: Node
+  position: [number, number, number]
+  isActive: boolean
+  onClick: () => void
 }
 
 const RoadmapNode: React.FC<RoadmapNodeProps> = ({ node, position, isActive, onClick }) => {
-  const meshRef = useRef();
+  const meshRef = useRef<THREE.Mesh>(null)
   
   return (
     <motion.mesh
@@ -31,66 +47,63 @@ const RoadmapNode: React.FC<RoadmapNodeProps> = ({ node, position, isActive, onC
         roughness={0.5}
       />
       <Html distanceFactor={10}>
-        <div className="bg-gray-800/90 backdrop-blur-sm p-2 rounded-lg text-white text-sm">
+        <div className="bg-gray-800/90 backdrop-blur-sm p-2 rounded-lg text-white text-sm whitespace-nowrap">
           {node.data.label}
         </div>
       </Html>
     </motion.mesh>
-  );
-};
+  )
+}
 
 interface RoadmapEdgeProps {
-  start: [number, number, number];
-  end: [number, number, number];
+  start: [number, number, number]
+  end: [number, number, number]
 }
 
 const RoadmapEdge: React.FC<RoadmapEdgeProps> = ({ start, end }) => {
   return (
     <line>
-      <bufferGeometry attach="geometry">
+      <bufferGeometry>
         <float32BufferAttribute attach="attributes-position" args={[new Float32Array([...start, ...end]), 3]} />
       </bufferGeometry>
-      <lineBasicMaterial attach="material" color="#6B7280" linewidth={1} />
+      <lineBasicMaterial color="#6B7280" linewidth={1} />
     </line>
-  );
-};
-
-interface OrbitalRoadmapProps {
-  nodes: Node[];
-  edges: Edge[];
+  )
 }
 
-const OrbitalRoadmap: React.FC<OrbitalRoadmapProps> = ({ nodes, edges }) => {
-  const [activeNode, setActiveNode] = useState<string | null>(null);
-  const controlsRef = useRef();
+const OrbitalRoadmap: React.FC = () => {
+  const [activeNode, setActiveNode] = useState<string | null>(null)
+  const controlsRef = useRef()
   
-  // Convert 2D positions to 3D
-  const nodePositions = new Map(nodes.map(node => [
+  // Convert 2D positions to 3D with better spacing
+  const nodePositions = new Map(sampleNodes.map(node => [
     node.id,
     [
-      node.position.x / 100,
-      node.position.y / 100,
+      node.position.x / 50, // Adjusted scaling factor
+      node.position.y / 50,
       0
     ] as [number, number, number]
-  ]));
+  ]))
 
   const handleNodeClick = (nodeId: string) => {
-    setActiveNode(nodeId);
+    setActiveNode(nodeId)
     
     if (controlsRef.current) {
-      const position = nodePositions.get(nodeId);
-      controlsRef.current.target.set(...position);
+      const position = nodePositions.get(nodeId)
+      controlsRef.current.target.set(...position)
     }
-  };
+  }
 
   return (
-    <div className="w-full h-screen">
-      <Canvas camera={{ position: [0, 0, 50], fov: 50 }}>
+    <div className="w-full h-[800px] bg-gray-900 rounded-lg overflow-hidden">
+      <Canvas camera={{ position: [0, 0, 20], fov: 50 }}>
+        <color attach="background" args={['#111827']} />
         <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} />
+        <pointLight position={[10, 10, 10]} intensity={1} />
+        <Environment preset="city" />
         
         {/* Nodes */}
-        {nodes.map(node => (
+        {sampleNodes.map(node => (
           <RoadmapNode
             key={node.id}
             node={node}
@@ -101,7 +114,7 @@ const OrbitalRoadmap: React.FC<OrbitalRoadmapProps> = ({ nodes, edges }) => {
         ))}
         
         {/* Edges */}
-        {edges.map(edge => (
+        {sampleEdges.map(edge => (
           <RoadmapEdge
             key={`${edge.source}-${edge.target}`}
             start={nodePositions.get(edge.source)}
@@ -113,22 +126,23 @@ const OrbitalRoadmap: React.FC<OrbitalRoadmapProps> = ({ nodes, edges }) => {
           ref={controlsRef}
           enablePan={true}
           enableZoom={true}
-          minDistance={10}
-          maxDistance={100}
+          minDistance={5}
+          maxDistance={50}
         />
       </Canvas>
       
       {/* UI Controls */}
-      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2">
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
         <button
           onClick={() => setActiveNode(null)}
-          className="bg-gray-800/80 text-white px-4 py-2 rounded-full"
+          className="bg-gray-800/80 hover:bg-gray-700/80 text-white px-4 py-2 rounded-full transition-colors"
         >
           Reset View
         </button>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default OrbitalRoadmap;
+export default OrbitalRoadmap
+
