@@ -1,9 +1,12 @@
-"use client"
-
 import React from 'react'
 import { motion } from 'framer-motion'
-import StellarRoadmap from '@/components/StellarRoadmap'
+import dynamic from 'next/dynamic'
 import { initialNodes, initialEdges } from '@/components/roadmapData'
+
+const StellarRoadmap = dynamic(() => import('@/components/StellarRoadmap'), {
+  ssr: false,
+  loading: () => <div className="text-white text-center">Loading roadmap...</div>
+})
 
 const Index = () => {
   return (
