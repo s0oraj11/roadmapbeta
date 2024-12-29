@@ -3,6 +3,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import OrbitalRoadmap from '@/components/OrbitalRoadmap'
+import StellarRoadmap from '@/components/StellarRoadmap'
 
 const Index = () => {
   return (
@@ -26,7 +27,7 @@ const Index = () => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
         >
-          <OrbitalRoadmap />
+          <StellarRoadmap nodes={initialNodes} edges={initialEdges} />
         </motion.div>
       </div>
     </div>
