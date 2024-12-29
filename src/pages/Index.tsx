@@ -1,7 +1,8 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import RoadmapFlow from '@/components/RoadmapFlow';
-import OrbitalRoadmap from '@/components/OrbitalRoadmap';
+"use client"
+
+import React from 'react'
+import { motion } from 'framer-motion'
+import OrbitalRoadmap from '@/components/OrbitalRoadmap'
 
 const Index = () => {
   return (
@@ -29,7 +30,8 @@ const Index = () => {
         </motion.div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Index;
+export default Index
+
