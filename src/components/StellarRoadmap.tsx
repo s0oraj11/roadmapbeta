@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react'
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Html, Stars } from '@react-three/drei'
 import { motion } from 'framer-motion'
@@ -24,7 +24,7 @@ interface StellarRoadmapProps {
   edges: FlowEdge[]
 }
 
-const StellarNode = ({ 
+const StellarNode = React.memo(({ 
   node,
   position,
   isActive,
@@ -32,7 +32,6 @@ const StellarNode = ({
   onDrag,
   isLocked,
   onSelect,
-  onDragStart,
 }: { 
   node: NodeType
   position: [number, number, number]
@@ -41,7 +40,6 @@ const StellarNode = ({
   onDrag: (position: [number, number, number]) => void
   isLocked: boolean
   onSelect: () => void
-  onDragStart: () => void
 }) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const { camera } = useThree()
@@ -62,16 +60,14 @@ const StellarNode = ({
   const handlePointerDown = useCallback((e: THREE.Event<PointerEvent>) => {
     e.stopPropagation()
     dragging.current = true
-    document.body.style.cursor = 'grabbing'
     previousPosition.current = [e.clientX, e.clientY]
-    onDragStart()
-  }, [onDragStart])
+  }, [])
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!dragging.current) return
 
-    const dx = (e.clientX - previousPosition.current[0]) / 100
-    const dy = -(e.clientY - previousPosition.current[1]) / 100
+    const dx = (e.clientX - previousPosition.current[0]) / 50
+    const dy = -(e.clientY - previousPosition.current[1]) / 50
 
     const newPosition: [number, number, number] = [
       position[0] + dx,
@@ -84,11 +80,8 @@ const StellarNode = ({
   }, [position, onDrag])
 
   const handlePointerUp = useCallback(() => {
-    if (!dragging.current) return
-
     dragging.current = false
-    document.body.style.cursor = isLocked ? 'grab' : 'auto'
-  }, [isLocked])
+  }, [])
 
   useEffect(() => {
     window.addEventListener('pointermove', handlePointerMove)
@@ -108,14 +101,6 @@ const StellarNode = ({
         if (!isLocked) {
           onClick()
           onSelect()
-        }
-      }}
-      onPointerEnter={() => {
-        document.body.style.cursor = isLocked ? 'grab' : 'pointer'
-      }}
-      onPointerLeave={() => {
-        if (!dragging.current) {
-          document.body.style.cursor = 'auto'
         }
       }}
       onPointerDown={handlePointerDown}
@@ -154,9 +139,9 @@ const StellarNode = ({
       </Html>
     </group>
   )
-}
+})
 
-const ConstellationEdge = ({ 
+const ConstellationEdge = React.memo(({ 
   start, 
   end,
   animated,
@@ -183,7 +168,6 @@ const ConstellationEdge = ({
     if (isLocked) {
       e.stopPropagation()
       dragging.current = true
-      document.body.style.cursor = 'grabbing'
       previousPosition.current = [e.clientX, e.clientY]
     }
   }, [isLocked])
@@ -191,19 +175,16 @@ const ConstellationEdge = ({
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!dragging.current) return
 
-    const dx = (e.clientX - previousPosition.current[0]) / 100
-    const dy = -(e.clientY - previousPosition.current[1]) / 100
+    const dx = (e.clientX - previousPosition.current[0]) / 50
+    const dy = -(e.clientY - previousPosition.current[1]) / 50
 
     onDrag([dx, dy, 0])
     previousPosition.current = [e.clientX, e.clientY]
   }, [onDrag])
 
   const handlePointerUp = useCallback(() => {
-    if (!dragging.current) return
-
     dragging.current = false
-    document.body.style.cursor = isLocked ? 'grab' : 'auto'
-  }, [isLocked])
+  }, [])
 
   useEffect(() => {
     window.addEventListener('pointermove', handlePointerMove)
@@ -238,12 +219,6 @@ const ConstellationEdge = ({
     <line 
       ref={ref} 
       geometry={geometry}
-      onPointerEnter={() => {
-        if (isLocked) document.body.style.cursor = 'grab'
-      }}
-      onPointerLeave={() => {
-        if (!dragging.current) document.body.style.cursor = 'auto'
-      }}
       onPointerDown={handlePointerDown}
     >
       <lineBasicMaterial 
@@ -254,7 +229,7 @@ const ConstellationEdge = ({
       />
     </line>
   )
-}
+})
 
 const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Camera) => void }) => {
   const { camera } = useThree()
@@ -268,26 +243,26 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
 }
 
 const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges: flowEdges }) => {
-  const nodes: NodeType[] = flowNodes.map(node => ({
+  const nodes: NodeType[] = useMemo(() => flowNodes.map(node => ({
     id: node.id,
     data: node.data,
     position: node.position,
     className: node.className
-  }))
+  })), [flowNodes])
   
-  const edges: EdgeType[] = flowEdges.map(edge => ({
+  const edges: EdgeType[] = useMemo(() => flowEdges.map(edge => ({
     id: edge.id,
     source: edge.source,
     target: edge.target,
     animated: edge.animated
-  }))
+  })), [flowEdges])
 
   const [activeNode, setActiveNode] = useState<string | null>(null)
   const controlsRef = useRef<any>()
   const [camera, setCamera] = useState<THREE.Camera | null>(null)
   const initialCameraPosition = useRef<THREE.Vector3 | null>(null)
   
-  const [nodePositions, setNodePositions] = useState(new Map(nodes.map(node => [
+  const [nodePositions, setNodePositions] = useState(() => new Map(nodes.map(node => [
     node.id,
     [
       node.position.x / 25 - 8,
@@ -441,11 +416,12 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   }, [nodes, nodePositions])
 
   useEffect(() => {
-    if (isLocked) {
-      document.body.style.cursor = 'grab'
-    } else {
-      document.body.style.cursor = 'auto'
+    const setCursor = () => {
+      document.body.style.cursor = isLocked ? 'grab' : 'auto'
     }
+    setCursor()
+    window.addEventListener('mousemove', setCursor)
+    return () => window.removeEventListener('mousemove', setCursor)
   }, [isLocked])
 
   return (
@@ -568,7 +544,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                 onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
                 isLocked={isLocked}
                 onSelect={() => handleNodeSelect(node.id)}
-                onDragStart={() => {}}
               />
             )
           }
@@ -590,4 +565,3 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 }
 
 export default StellarRoadmap
-
