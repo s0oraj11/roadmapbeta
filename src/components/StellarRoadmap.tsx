@@ -212,7 +212,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     node.id,
     [
       node.position.x / 25 - 8,
-      -node.position.y / 25 + 8,
+      node.position.y / 25 + 8,
       0
     ] as [number, number, number]
   ])))
@@ -403,8 +403,13 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
           ref={controlsRef}
           enablePan={true}
           enableZoom={true}
+          enableRotate={true}
           minDistance={10}
           maxDistance={50}
+          maxPolarAngle={Math.PI} // Allow full vertical rotation
+          minPolarAngle={0}
+          maxAzimuthAngle={Math.PI * 2} // Allow full horizontal rotation
+          minAzimuthAngle={-Math.PI * 2}
           makeDefault
         />
       </Canvas>
