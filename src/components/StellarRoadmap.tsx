@@ -17,20 +17,24 @@ interface EdgeType {
   source: string
   target: string
   animated?: boolean
-  style?: { stroke?: string }
 }
 
 interface StellarRoadmapProps {
   nodes: FlowNode[]
   edges: FlowEdge[]
 }
-
+interface Position3D {
+  x: number
+  y: number
+  z: number
+}
 const StellarNode = ({ 
   node,
   position,
   isActive,
   onClick,
   onDrag,
+  onDragEnd,
 }: { 
   node: NodeType
   position: [number, number, number]
@@ -42,7 +46,6 @@ const StellarNode = ({
   const { camera } = useThree()
   const isPrimary = node.className === 'start-node'
   const isPattern = node.className === 'pattern-node'
-  const isSubPattern = node.className === 'subpattern-node'
   const dragging = useRef(false)
   const previousPosition = useRef([0, 0])
   
@@ -52,8 +55,8 @@ const StellarNode = ({
     }
   })
 
-  const nodeScale = isPrimary ? 1.2 : isPattern ? 1 : isSubPattern ? 0.7 : 0.8
-  const nodeColor = isPrimary ? "#FFD700" : isPattern ? "#6366F1" : isSubPattern ? "#06B6D4" : "#4B5563"
+  const nodeScale = isPrimary ? 1.2 : isPattern ? 1 : 0.8
+  const nodeColor = isPrimary ? "#FFD700" : isPattern ? "#6366F1" : "#4B5563"
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -72,8 +75,11 @@ const StellarNode = ({
       previousPosition.current = [event.clientX, event.clientY]
     }
 
-    const handleMouseUp = () => {
-      dragging.current = false
+ const handleMouseUp = () => {
+      if (dragging.current) {
+        dragging.current = false
+        onDragEnd()
+      }
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
@@ -87,7 +93,7 @@ const StellarNode = ({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [position, onDrag, camera])
+  }, [position, onDrag, onDragEnd])
   
   return (
     <group
@@ -111,8 +117,8 @@ const StellarNode = ({
           color={isActive ? "#60A5FA" : nodeColor}
           metalness={0.8}
           roughness={0.2}
-          emissive={isPrimary || isPattern || isSubPattern ? nodeColor : "#000000"}
-          emissiveIntensity={isPrimary ? 0.5 : isPattern ? 0.3 : isSubPattern ? 0.2 : 0}
+          emissive={isPrimary || isPattern ? nodeColor : "#000000"}
+          emissiveIntensity={isPrimary ? 0.5 : isPattern ? 0.3 : 0}
         />
       </mesh>
       <Html center distanceFactor={15}>
@@ -122,8 +128,6 @@ const StellarNode = ({
             ? 'bg-yellow-500/20 text-yellow-200' 
             : node.className === 'pattern-node'
             ? 'bg-indigo-500/20 text-indigo-200'
-            : node.className === 'subpattern-node'
-            ? 'bg-cyan-500/20 text-cyan-200'
             : 'bg-gray-800/90 text-white'}
         `}>
           {node.data.label}
@@ -136,13 +140,11 @@ const StellarNode = ({
 const ConstellationEdge = ({ 
   start, 
   end,
-  animated,
-  style
+  animated
 }: { 
   start: [number, number, number]
   end: [number, number, number]
   animated?: boolean
-  style?: { stroke?: string }
 }) => {
   const ref = useRef<THREE.Line>(null)
   
@@ -174,7 +176,7 @@ const ConstellationEdge = ({
   return (
     <line ref={ref} geometry={geometry}>
       <lineBasicMaterial 
-        color={style?.stroke || (animated ? "#6366F1" : "#4B5563")}
+        color={animated ? "#6366F1" : "#4B5563"}
         transparent={animated}
         opacity={animated ? 0.5 : 1}
         linewidth={1}
@@ -206,8 +208,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     id: edge.id,
     source: edge.source,
     target: edge.target,
-    animated: edge.animated,
-    style: edge.style
+    animated: edge.animated
   }))
 
   const [activeNode, setActiveNode] = useState<string | null>(null)
@@ -299,6 +300,56 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }))
   }, [nodes, nodePositions])
 
+  const [isGroupDragEnabled, setIsGroupDragEnabled] = useState(false)
+  const groupDragStartPosition = useRef<Position3D | null>(null)
+  const groupDragStartNodes = useRef<Map<string, [number, number, number]> | null>(null)
+
+  // Add to the existing handleNodeDrag function
+  const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
+    if (isGroupDragEnabled) {
+      if (!groupDragStartPosition.current) {
+        groupDragStartPosition.current = {
+          x: newPosition[0],
+          y: newPosition[1],
+          z: newPosition[2]
+        }
+        groupDragStartNodes.current = new Map(nodePositions)
+        return
+      }
+
+      const deltaX = newPosition[0] - groupDragStartPosition.current.x
+      const deltaY = newPosition[1] - groupDragStartPosition.current.y
+      const deltaZ = newPosition[2] - groupDragStartPosition.current.z
+
+      setNodePositions(prev => {
+        const updated = new Map(prev)
+        groupDragStartNodes.current?.forEach((startPos, id) => {
+          updated.set(id, [
+            startPos[0] + deltaX,
+            startPos[1] + deltaY,
+            startPos[2] + deltaZ
+          ])
+        })
+        return updated
+      })
+    } else {
+      setNodePositions(prev => {
+        const updated = new Map(prev)
+        updated.set(nodeId, newPosition)
+        return updated
+      })
+    }
+  }, [isGroupDragEnabled])
+
+  // Add cleanup for group drag
+  const handleGroupDragEnd = useCallback(() => {
+    groupDragStartPosition.current = null
+    groupDragStartNodes.current = null
+  }, [])
+
+
+
+  
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
@@ -307,6 +358,17 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       className="relative w-full h-[800px] bg-gray-950 rounded-lg overflow-hidden"
     >
       <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
+       <button
+          onClick={() => setIsGroupDragEnabled(!isGroupDragEnabled)}
+          className="p-2 hover:bg-gray-700 rounded"
+          title={isGroupDragEnabled ? "Disable Group Drag" : "Enable Group Drag"}
+        >
+          {isGroupDragEnabled ? (
+            <Unlock className="text-white" size={24} />
+          ) : (
+            <Lock className="text-white" size={24} />
+          )}
+        </button> 
         <button
           onClick={handleZoomIn}
           className="p-2 hover:bg-gray-700 rounded"
@@ -345,8 +407,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                   ? 'bg-yellow-400'
                   : node.className === 'pattern-node'
                   ? 'bg-indigo-400'
-                  : node.className === 'subpattern-node'
-                  ? 'bg-cyan-400'
                   : 'bg-gray-400'
                 }`}
               style={{
@@ -359,6 +419,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       </div>
 
       <Canvas>
+        
         <CameraController onCameraReady={handleCameraReady} />
         <color attach="background" args={['#030712']} />
         <ambientLight intensity={0.4} />
@@ -383,12 +444,12 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                 start={startPos}
                 end={endPos}
                 animated={edge.animated}
-                style={edge.style}
               />
             )
           }
           return null
         })}
+
 
         {nodes.map(node => {
           const position = nodePositions.get(node.id)
@@ -400,7 +461,10 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                 position={position}
                 isActive={node.id === activeNode}
                 onClick={() => handleNodeClick(node.id)}
-                onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
+                onDrag={(newPos) => {
+                  handleNodeDrag(node.id, newPos)
+                }}
+                onDragEnd={handleGroupDragEnd}
               />
             )
           }
