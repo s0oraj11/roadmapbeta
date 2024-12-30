@@ -63,8 +63,8 @@ const StellarNode = ({
     const handleMouseMove = (event: MouseEvent) => {
       if (!dragging.current) return
 
-      const x = (event.clientX - previousPosition.current[0]) / 100
-      const y = -(event.clientY - previousPosition.current[1]) / 100
+      const x = (event.clientX - previousPosition.current[0]) / 50 // Increased smoothness
+      const y = -(event.clientY - previousPosition.current[1]) / 50 // Increased smoothness
 
       const newPosition: [number, number, number] = [
         position[0] + x,
@@ -78,6 +78,7 @@ const StellarNode = ({
 
     const handleMouseUp = () => {
       dragging.current = false
+      document.body.style.cursor = 'auto'
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
@@ -103,8 +104,15 @@ const StellarNode = ({
           onSelect()
         }
       }}
+      onPointerEnter={() => {
+        if (isLocked) document.body.style.cursor = 'grab'
+      }}
+      onPointerLeave={() => {
+        if (!dragging.current) document.body.style.cursor = 'auto'
+      }}
       onPointerDown={(e) => {
         e.stopPropagation()
+        if (isLocked) document.body.style.cursor = 'grabbing'
         dragging.current = true
         previousPosition.current = [e.clientX, e.clientY]
         onDragStart()
@@ -123,7 +131,19 @@ const StellarNode = ({
           emissiveIntensity={isPrimary ? 0.5 : isPattern ? 0.3 : 0}
         />
       </mesh>
-      <Html center distanceFactor={15}>
+      <Html 
+        center 
+        distanceFactor={15}
+        style={{ cursor: isLocked ? 'grab' : 'auto' }}
+        onClick={(e) => {
+          if (isLocked) {
+            e.stopPropagation()
+            dragging.current = true
+            previousPosition.current = [e.clientX, e.clientY]
+            onDragStart()
+          }
+        }}
+      >
         <div className={`
           px-3 py-1.5 rounded-lg text-sm whitespace-nowrap
           ${node.className === 'start-node' 
@@ -166,8 +186,8 @@ const ConstellationEdge = ({
     const handleMouseMove = (event: MouseEvent) => {
       if (!dragging.current) return
 
-      const x = (event.clientX - previousPosition.current[0]) / 100
-      const y = -(event.clientY - previousPosition.current[1]) / 100
+      const x = (event.clientX - previousPosition.current[0]) / 50 // Increased smoothness
+      const y = -(event.clientY - previousPosition.current[1]) / 50 // Increased smoothness
 
       const delta: [number, number, number] = [x, y, 0]
       onDrag(delta)
@@ -176,6 +196,7 @@ const ConstellationEdge = ({
 
     const handleMouseUp = () => {
       dragging.current = false
+      document.body.style.cursor = 'auto'
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
@@ -214,9 +235,16 @@ const ConstellationEdge = ({
     <line 
       ref={ref} 
       geometry={geometry}
+      onPointerEnter={() => {
+        if (isLocked) document.body.style.cursor = 'grab'
+      }}
+      onPointerLeave={() => {
+        if (!dragging.current) document.body.style.cursor = 'auto'
+      }}
       onPointerDown={(e) => {
         if (isLocked) {
           e.stopPropagation()
+          document.body.style.cursor = 'grabbing'
           dragging.current = true
           previousPosition.current = [e.clientX, e.clientY]
         }
