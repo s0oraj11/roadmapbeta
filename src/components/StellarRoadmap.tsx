@@ -51,7 +51,7 @@ const StellarNode = ({
   const previousPosition = useRef([0, 0])
   
   useFrame(() => {
-    if (meshRef.current) {
+    if (meshRef.current && !isLocked) {
       meshRef.current.rotation.y += 0.01
     }
   })
@@ -142,19 +142,54 @@ const StellarNode = ({
 const ConstellationEdge = ({ 
   start, 
   end,
-  animated
+  animated,
+  isLocked,
+  onDrag,
 }: { 
   start: [number, number, number]
   end: [number, number, number]
   animated?: boolean
+  isLocked: boolean
+  onDrag: (startDelta: [number, number, number]) => void
 }) => {
   const ref = useRef<THREE.Line>(null)
+  const dragging = useRef(false)
+  const previousPosition = useRef([0, 0])
   
   useFrame(({ clock }) => {
     if (animated && ref.current?.material) {
       (ref.current.material as THREE.Material).opacity = Math.sin(clock.getElapsedTime() * 2) * 0.5 + 0.5
     }
   })
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!dragging.current) return
+
+      const x = (event.clientX - previousPosition.current[0]) / 100
+      const y = -(event.clientY - previousPosition.current[1]) / 100
+
+      const delta: [number, number, number] = [x, y, 0]
+      onDrag(delta)
+      previousPosition.current = [event.clientX, event.clientY]
+    }
+
+    const handleMouseUp = () => {
+      dragging.current = false
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    if (dragging.current) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [onDrag])
 
   const direction = new THREE.Vector3(
     end[0] - start[0],
@@ -176,7 +211,17 @@ const ConstellationEdge = ({
   const geometry = new THREE.BufferGeometry().setFromPoints(points)
 
   return (
-    <line ref={ref} geometry={geometry}>
+    <line 
+      ref={ref} 
+      geometry={geometry}
+      onPointerDown={(e) => {
+        if (isLocked) {
+          e.stopPropagation()
+          dragging.current = true
+          previousPosition.current = [e.clientX, e.clientY]
+        }
+      }}
+    >
       <lineBasicMaterial 
         color={animated ? "#6366F1" : "#4B5563"}
         transparent={animated}
@@ -360,6 +405,22 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }))
   }, [nodes, nodePositions])
 
+  const handleEdgeDrag = useCallback((delta: [number, number, number]) => {
+    if (isLocked) {
+      setNodePositions(prev => {
+        const updated = new Map()
+        prev.forEach((pos, id) => {
+          updated.set(id, [
+            pos[0] + delta[0],
+            pos[1] + delta[1],
+            pos[2] + delta[2]
+          ])
+        })
+        return updated
+      })
+    }
+  }, [isLocked])
+
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
@@ -459,6 +520,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                 start={startPos}
                 end={endPos}
                 animated={edge.animated}
+                isLocked={isLocked}
+                onDrag={handleEdgeDrag}
               />
             )
           }
@@ -487,7 +550,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 
         <OrbitControls
           ref={controlsRef}
-          enablePan={true}
+          enablePan={!isLocked}
+          enableRotate={!isLocked}
           enableZoom={true}
           minDistance={5}
           maxDistance={100}
