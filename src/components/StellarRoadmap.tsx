@@ -58,7 +58,7 @@ const StellarNode = ({
       if (!dragging.current) return
 
       const x = (event.clientX - previousPosition.current[0]) / 100
-      const y = (event.clientY - previousPosition.current[1]) / 100
+      const y = -(event.clientY - previousPosition.current[1]) / 100
 
       const newPosition: [number, number, number] = [
         position[0] + x,
@@ -85,7 +85,7 @@ const StellarNode = ({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [position, onDrag])
+  }, [position, onDrag, camera])
   
   return (
     <group
@@ -181,7 +181,7 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
   const { camera } = useThree()
   
   useEffect(() => {
-    camera.position.set(0, 0, 20)
+    camera.position.set(0, 0, 15)
     onCameraReady(camera)
   }, [camera, onCameraReady])
   
@@ -211,49 +211,11 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   const [nodePositions, setNodePositions] = useState(new Map(nodes.map(node => [
     node.id,
     [
-      node.position.x / 100,
-      node.position.y / 100,
+      node.position.x / 25 - 8,
+      -node.position.y / 25 + 8,
       0
     ] as [number, number, number]
   ])))
-
-  const [groupOffset, setGroupOffset] = useState<[number, number, number]>([0, 0, 0])
-  const isDraggingGroup = useRef(false)
-  const previousGroupPosition = useRef<[number, number]>([0, 0])
-
-  const handleGroupDragStart = useCallback((e: React.MouseEvent) => {
-    isDraggingGroup.current = true
-    previousGroupPosition.current = [e.clientX, e.clientY]
-  }, [])
-
-  const handleGroupDragMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingGroup.current) return
-    
-    const deltaX = (e.clientX - previousGroupPosition.current[0]) / 100
-    const deltaY = (e.clientY - previousGroupPosition.current[1]) / 100
-    
-    setGroupOffset(prev => [
-      prev[0] + deltaX,
-      prev[1] - deltaY,
-      prev[2]
-    ])
-    
-    previousGroupPosition.current = [e.clientX, e.clientY]
-  }, [])
-
-  useEffect(() => {
-    window.addEventListener('mousemove', handleGroupDragMove)
-    window.addEventListener('mouseup', () => {
-      isDraggingGroup.current = false
-    })
-    
-    return () => {
-      window.removeEventListener('mousemove', handleGroupDragMove)
-      window.removeEventListener('mouseup', () => {
-        isDraggingGroup.current = false
-      })
-    }
-  }, [handleGroupDragMove])
 
   const handleNodeClick = useCallback((nodeId: string) => {
     setActiveNode(nodeId)
@@ -310,14 +272,13 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       controlsRef.current.target.set(0, 0, 0)
       camera.updateProjectionMatrix()
       controlsRef.current.update()
-      setGroupOffset([0, 0, 0])
     }
   }, [camera])
 
   const handleCameraReady = useCallback((camera: THREE.Camera) => {
     setCamera(camera)
     if (!initialCameraPosition.current) {
-      initialCameraPosition.current = camera.position.clone()
+      initialCameraPosition.current = new THREE.Vector3(0, 0, 15)
     }
   }, [])
 
@@ -388,7 +349,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         </div>
       </div>
 
-      <Canvas onMouseDown={handleGroupDragStart}>
+      <Canvas>
+        
         <CameraController onCameraReady={handleCameraReady} />
         <color attach="background" args={['#030712']} />
         <ambientLight intensity={0.4} />
@@ -420,39 +382,30 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         })}
 
 
-          {nodes.map(node => {
+                                             {nodes.map(node => {
           const position = nodePositions.get(node.id)
-  if (position) {
-    return (
-      <StellarNode
-        key={node.id}
-        node={node}
-        position={[
-          position[0] + groupOffset[0],
-          position[1] + groupOffset[1],
-          position[2] + groupOffset[2]
-        ]}
-        isActive={node.id === activeNode}
-        onClick={() => handleNodeClick(node.id)}
-        onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
-      />
-    )
-  }
+          if (position) {
+            return (
+              <StellarNode
+                key={node.id}
+                node={node}
+                position={position}
+                isActive={node.id === activeNode}
+                onClick={() => handleNodeClick(node.id)}
+                onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
+              />
+            )
+          }
           return null
         })}
 
         <OrbitControls
-  ref={controlsRef}
-  enablePan={true}
-  enableZoom={true}
-  enableRotate={true}
-  minDistance={5}  // Reduce from 10 to allow closer zoom
-  maxDistance={30} // Reduce from 50 to keep objects more visible
-  maxPolarAngle={Math.PI * 2} // Allow full vertical rotation
-  minPolarAngle={-Math.PI * 2}
-  maxAzimuthAngle={Math.PI * 2} // Allow full horizontal rotation
-  minAzimuthAngle={-Math.PI * 2}
-  makeDefault
+          ref={controlsRef}
+          enablePan={true}
+          enableZoom={true}
+          minDistance={5}
+          maxDistance={100}
+          makeDefault
         />
       </Canvas>
     </motion.div>
