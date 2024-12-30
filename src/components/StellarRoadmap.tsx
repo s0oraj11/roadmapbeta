@@ -30,12 +30,16 @@ const StellarNode = ({
   isActive,
   onClick,
   onDrag,
+  isLocked,
+  onSelect,
 }: { 
   node: NodeType
   position: [number, number, number]
   isActive: boolean
   onClick: () => void
   onDrag: (position: [number, number, number]) => void
+  isLocked: boolean
+  onSelect: () => void
 }) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const { camera } = useThree()
@@ -43,6 +47,7 @@ const StellarNode = ({
   const isPattern = node.className === 'pattern-node'
   const dragging = useRef(false)
   const previousPosition = useRef([0, 0])
+  const dragStartPosition = useRef<[number, number, number]>([0, 0, 0])
   
   useFrame(() => {
     if (meshRef.current) {
@@ -61,9 +66,9 @@ const StellarNode = ({
       const y = -(event.clientY - previousPosition.current[1]) / 100
 
       const newPosition: [number, number, number] = [
-        position[0] + x,
-        position[1] + y,
-        position[2]
+        dragStartPosition.current[0] + x,
+        dragStartPosition.current[1] + y,
+        dragStartPosition.current[2]
       ]
 
       onDrag(newPosition)
@@ -85,7 +90,7 @@ const StellarNode = ({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [position, onDrag, camera])
+  }, [position, onDrag, isLocked])
   
   return (
     <group
@@ -93,11 +98,13 @@ const StellarNode = ({
       onClick={(e) => {
         e.stopPropagation()
         onClick()
+        onSelect()
       }}
       onPointerDown={(e) => {
         e.stopPropagation()
         dragging.current = true
         previousPosition.current = [e.clientX, e.clientY]
+        dragStartPosition.current = position
       }}
     >
       <mesh 
@@ -217,10 +224,13 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     ] as [number, number, number]
   ])))
 
-  const [isLocked, setIsLocked] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [isLocked, setIsLocked] = useState(false)
+  const [dragStartPositions, setDragStartPositions] = useState<Map<string, [number, number, number]>>(new Map())
 
   const handleNodeClick = useCallback((nodeId: string) => {
     setActiveNode(nodeId)
+    setSelectedNode(nodeId)
     if (controlsRef.current) {
       const position = nodePositions.get(nodeId)
       if (position) {
@@ -230,32 +240,63 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }
   }, [nodePositions])
 
-  const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
-    setNodePositions(prev => {
-      const updated = new Map(prev);
-      const dragDelta = [
-        newPosition[0] - (prev.get(nodeId)?.[0] ?? 0),
-        newPosition[1] - (prev.get(nodeId)?.[1] ?? 0),
-        newPosition[2] - (prev.get(nodeId)?.[2] ?? 0),
-      ];
-
-      if (isLocked) {
-        // Move all nodes together when locked
-        prev.forEach((pos, id) => {
-          updated.set(id, [
-            pos[0] + dragDelta[0],
-            pos[1] + dragDelta[1],
-            pos[2] + dragDelta[2],
-          ]);
-        });
-      } else {
-        // Move only the dragged node when unlocked
-        updated.set(nodeId, newPosition);
+  const handleNodeSelect = useCallback((nodeId: string) => {
+    if (controlsRef.current && camera) {
+      const position = nodePositions.get(nodeId)
+      if (position) {
+        // Store current camera position relative to selected node
+        const offset = new THREE.Vector3(
+          camera.position.x - position[0],
+          camera.position.y - position[1],
+          camera.position.z - position[2]
+        )
+        
+        // Update orbit controls to center on selected node
+        controlsRef.current.target.set(...position)
+        camera.position.set(
+          position[0] + offset.x,
+          position[1] + offset.y,
+          position[2] + offset.z
+        )
+        camera.updateProjectionMatrix()
+        controlsRef.current.update()
       }
-      
-      return updated;
-    });
-  }, [isLocked]);
+    }
+  }, [nodePositions, camera])
+
+  const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
+    if (isLocked) {
+      // Calculate the movement delta
+      const oldPos = nodePositions.get(nodeId)
+      if (oldPos) {
+        const delta: [number, number, number] = [
+          newPosition[0] - oldPos[0],
+          newPosition[1] - oldPos[1],
+          newPosition[2] - oldPos[2]
+        ]
+
+        // Move all nodes by the same delta
+        setNodePositions(prev => {
+          const updated = new Map(prev)
+          prev.forEach((pos, id) => {
+            updated.set(id, [
+              pos[0] + delta[0],
+              pos[1] + delta[1],
+              pos[2] + delta[2]
+            ])
+          })
+          return updated
+        })
+      }
+    } else {
+      // Move only the dragged node
+      setNodePositions(prev => {
+        const updated = new Map(prev)
+        updated.set(nodeId, newPosition)
+        return updated
+      })
+    }
+  }, [isLocked, nodePositions])
 
   const handleZoomIn = useCallback(() => {
     if (controlsRef.current && camera) {
@@ -367,27 +408,46 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         </button>
       </div>
 
-      <div className="absolute bottom-4 right-4 z-10 w-48 h-48 bg-gray-800/80 rounded-lg border border-gray-700 p-2">
-        <div className="relative w-full h-full">
-          {updateMinimapPositions().map(node => (
-            <div
-              key={node.id}
-              className={`absolute w-2 h-2 rounded-full transition-colors duration-200
-                ${node.id === activeNode 
-                  ? 'bg-blue-400' 
-                  : node.className === 'start-node'
-                  ? 'bg-yellow-400'
-                  : node.className === 'pattern-node'
-                  ? 'bg-indigo-400'
-                  : 'bg-gray-400'
-                }`}
-              style={{
-                left: `${(node.position.x / 800) * 100}%`,
-                top: `${(node.position.y / 800) * 100}%`,
-              }}
-            />
-          ))}
+      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2">
+        <div className="w-48 h-48 bg-gray-800/80 rounded-lg border border-gray-700 p-2">
+          <div className="relative w-full h-full">
+            {updateMinimapPositions().map(node => (
+              <div
+                key={node.id}
+                className={`absolute w-2 h-2 rounded-full transition-colors duration-200
+                  ${node.id === activeNode 
+                    ? 'bg-blue-400' 
+                    : node.className === 'start-node'
+                    ? 'bg-yellow-400'
+                    : node.className === 'pattern-node'
+                    ? 'bg-indigo-400'
+                    : 'bg-gray-400'
+                  }`}
+                style={{
+                  left: `${(node.position.x / 800) * 100}%`,
+                  top: `${(node.position.y / 800) * 100}%`,
+                }}
+              />
+            ))}
+          </div>
         </div>
+        <button
+          onClick={() => setIsLocked(!isLocked)}
+          className="p-2 hover:bg-gray-700 rounded bg-gray-800/80 border border-gray-700"
+          title={isLocked ? "Unlock group drag" : "Lock for group drag"}
+        >
+          {isLocked ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+            </svg>
+          )}
+        </button>
       </div>
 
       <Canvas>
@@ -423,7 +483,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         })}
 
 
-                                             {nodes.map(node => {
+        {nodes.map(node => {
           const position = nodePositions.get(node.id)
           if (position) {
             return (
@@ -434,6 +494,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                 isActive={node.id === activeNode}
                 onClick={() => handleNodeClick(node.id)}
                 onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
+                isLocked={isLocked}
+                onSelect={() => handleNodeSelect(node.id)}
               />
             )
           }
