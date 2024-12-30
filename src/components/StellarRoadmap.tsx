@@ -49,7 +49,10 @@ const StellarNode = ({
   const isPattern = node.className === 'pattern-node'
   const dragging = useRef(false)
   const previousPosition = useRef([0, 0])
-  const targetPosition = useRef([0, 0])
+  const lastDelta = useRef([0, 0])
+  const velocity = useRef([0, 0])
+  const lastTime = useRef(Date.now())
+  const animationFrame = useRef<number>()
   
   useFrame(() => {
     if (meshRef.current && !isLocked) {
@@ -60,33 +63,70 @@ const StellarNode = ({
   const nodeScale = isPrimary ? 1.2 : isPattern ? 1 : 0.8
   const nodeColor = isPrimary ? "#FFD700" : isPattern ? "#6366F1" : "#4B5563"
 
+  const applyInertia = useCallback(() => {
+    if (Math.abs(velocity.current[0]) < 0.01 && Math.abs(velocity.current[1]) < 0.01) return
+
+    const dampingFactor = 0.95
+    velocity.current = [
+      velocity.current[0] * dampingFactor,
+      velocity.current[1] * dampingFactor
+    ]
+
+    const newPosition: [number, number, number] = [
+      position[0] + velocity.current[0] / 1000,
+      position[1] + velocity.current[1] / 1000,
+      position[2]
+    ]
+
+    onDrag(newPosition)
+
+    if (Math.abs(velocity.current[0]) > 0.01 || Math.abs(velocity.current[1]) > 0.01) {
+      animationFrame.current = requestAnimationFrame(applyInertia)
+    }
+  }, [position, onDrag])
+
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (!dragging.current) return
 
-      const x = (event.clientX - previousPosition.current[0]) / 100
-      const y = -(event.clientY - previousPosition.current[1]) / 100
+      const currentTime = Date.now()
+      const deltaTime = (currentTime - lastTime.current) / 1000
+      lastTime.current = currentTime
 
-      // Smooth movement using lerp
-      targetPosition.current = [
-        position[0] + x,
-        position[1] + y,
+      const x = (event.clientX - previousPosition.current[0])
+      const y = -(event.clientY - previousPosition.current[1])
+
+      velocity.current = [
+        (x - lastDelta.current[0]) / deltaTime,
+        (y - lastDelta.current[1]) / deltaTime
+      ]
+
+      const smoothingFactor = 0.15
+      const smoothedX = x * smoothingFactor
+      const smoothedY = y * smoothingFactor
+
+      lastDelta.current = [x, y]
+
+      const newPosition: [number, number, number] = [
+        position[0] + smoothedX / 100,
+        position[1] + smoothedY / 100,
         position[2]
       ]
 
-      const smoothedPosition: [number, number, number] = [
-        position[0] + (targetPosition.current[0] - position[0]) * 0.2,
-        position[1] + (targetPosition.current[1] - position[1]) * 0.2,
-        position[2]
-      ]
-
-      onDrag(smoothedPosition)
+      onDrag(newPosition)
       previousPosition.current = [event.clientX, event.clientY]
     }
 
     const handleMouseUp = () => {
+      if (!dragging.current) return
+
       dragging.current = false
       document.body.style.cursor = isLocked ? 'grab' : 'auto'
+
+      if (isLocked) {
+        requestAnimationFrame(applyInertia)
+      }
+
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
@@ -99,8 +139,11 @@ const StellarNode = ({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      if (animationFrame.current) {
+        cancelAnimationFrame(animationFrame.current)
+      }
     }
-  }, [position, onDrag, isLocked])
+  }, [position, onDrag, isLocked, applyInertia])
   
   return (
     <group
@@ -113,11 +156,11 @@ const StellarNode = ({
         }
       }}
       onPointerEnter={() => {
-        document.body.style.cursor = isLocked ? 'grab' : 'auto'
+        document.body.style.cursor = isLocked ? 'grab' : 'pointer'
       }}
       onPointerLeave={() => {
         if (!dragging.current) {
-          document.body.style.cursor = isLocked ? 'grab' : 'auto'
+          document.body.style.cursor = 'auto'
         }
       }}
       onPointerDown={(e) => {
@@ -125,26 +168,15 @@ const StellarNode = ({
         dragging.current = true
         document.body.style.cursor = 'grabbing'
         previousPosition.current = [e.clientX, e.clientY]
+        lastDelta.current = [0, 0]
+        velocity.current = [0, 0]
+        lastTime.current = Date.now()
         onDragStart()
       }}
     >
       <mesh 
         ref={meshRef}
         scale={isActive ? 1.2 : 1}
-        raycast={(raycaster, intersects) => {
-          const sphere = new THREE.Sphere(new THREE.Vector3(), nodeScale * 1.2)
-          const rayOrigin = raycaster.ray.origin.clone()
-          const rayDirection = raycaster.ray.direction.clone()
-          const intersection = new THREE.Vector3()
-
-          if (sphere.intersectRay(new THREE.Ray(rayOrigin, rayDirection), intersection)) {
-            intersects.push({
-              distance: rayOrigin.distanceTo(intersection),
-              point: intersection.clone(),
-              object: meshRef.current!,
-            })
-          }
-        }}
       >
         <sphereGeometry args={[nodeScale, 32, 32]} />
         <meshStandardMaterial 
@@ -158,15 +190,14 @@ const StellarNode = ({
       <Html 
         center 
         distanceFactor={15}
-        style={{ cursor: isLocked ? 'grab' : 'auto', pointerEvents: 'all' }}
+        style={{ 
+          cursor: isLocked ? 'grab' : 'pointer',
+          pointerEvents: 'all',
+          userSelect: 'none'
+        }}
         onClick={(e) => {
           e.stopPropagation()
-          if (isLocked) {
-            dragging.current = true
-            document.body.style.cursor = 'grabbing'
-            previousPosition.current = [e.clientX, e.clientY]
-            onDragStart()
-          } else {
+          if (!isLocked) {
             onClick()
             onSelect()
           }
@@ -177,20 +208,21 @@ const StellarNode = ({
             dragging.current = true
             document.body.style.cursor = 'grabbing'
             previousPosition.current = [e.clientX, e.clientY]
+            lastDelta.current = [0, 0]
+            velocity.current = [0, 0]
+            lastTime.current = Date.now()
             onDragStart()
           }
         }}
       >
-        <div 
-          className={`
-            px-3 py-1.5 rounded-lg text-sm whitespace-nowrap
-            ${node.className === 'start-node' 
-              ? 'bg-yellow-500/20 text-yellow-200' 
-              : node.className === 'pattern-node'
-              ? 'bg-indigo-500/20 text-indigo-200'
-              : 'bg-gray-800/90 text-white'}
-          `}
-        >
+        <div className={`
+          px-3 py-1.5 rounded-lg text-sm whitespace-nowrap
+          ${node.className === 'start-node' 
+            ? 'bg-yellow-500/20 text-yellow-200' 
+            : node.className === 'pattern-node'
+            ? 'bg-indigo-500/20 text-indigo-200'
+            : 'bg-gray-800/90 text-white'}
+        `}>
           {node.data.label}
         </div>
       </Html>
@@ -214,7 +246,10 @@ const ConstellationEdge = ({
   const ref = useRef<THREE.Line>(null)
   const dragging = useRef(false)
   const previousPosition = useRef([0, 0])
-  const targetPosition = useRef([0, 0, 0])
+  const lastDelta = useRef([0, 0])
+  const velocity = useRef([0, 0])
+  const lastTime = useRef(Date.now())
+  const animationFrame = useRef<number>()
   
   useFrame(({ clock }) => {
     if (animated && ref.current?.material) {
@@ -222,27 +257,70 @@ const ConstellationEdge = ({
     }
   })
 
+  const applyInertia = useCallback(() => {
+    if (Math.abs(velocity.current[0]) < 0.01 && Math.abs(velocity.current[1]) < 0.01) return
+
+    const dampingFactor = 0.95
+    velocity.current = [
+      velocity.current[0] * dampingFactor,
+      velocity.current[1] * dampingFactor
+    ]
+
+    const delta: [number, number, number] = [
+      velocity.current[0] / 1000,
+      velocity.current[1] / 1000,
+      0
+    ]
+
+    onDrag(delta)
+
+    if (Math.abs(velocity.current[0]) > 0.01 || Math.abs(velocity.current[1]) > 0.01) {
+      animationFrame.current = requestAnimationFrame(applyInertia)
+    }
+  }, [onDrag])
+
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (!dragging.current) return
 
-      const x = (event.clientX - previousPosition.current[0]) / 100
-      const y = -(event.clientY - previousPosition.current[1]) / 100
+      const currentTime = Date.now()
+      const deltaTime = (currentTime - lastTime.current) / 1000
+      lastTime.current = currentTime
 
-      targetPosition.current = [x, y, 0]
-      const smoothedDelta: [number, number, number] = [
-        targetPosition.current[0] * 0.2,
-        targetPosition.current[1] * 0.2,
+      const x = (event.clientX - previousPosition.current[0])
+      const y = -(event.clientY - previousPosition.current[1])
+
+      velocity.current = [
+        (x - lastDelta.current[0]) / deltaTime,
+        (y - lastDelta.current[1]) / deltaTime
+      ]
+
+      const smoothingFactor = 0.15
+      const smoothedX = x * smoothingFactor
+      const smoothedY = y * smoothingFactor
+
+      lastDelta.current = [x, y]
+
+      const delta: [number, number, number] = [
+        smoothedX / 100,
+        smoothedY / 100,
         0
       ]
 
-      onDrag(smoothedDelta)
+      onDrag(delta)
       previousPosition.current = [event.clientX, event.clientY]
     }
 
     const handleMouseUp = () => {
+      if (!dragging.current) return
+
       dragging.current = false
       document.body.style.cursor = isLocked ? 'grab' : 'auto'
+
+      if (isLocked) {
+        requestAnimationFrame(applyInertia)
+      }
+
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
@@ -255,8 +333,11 @@ const ConstellationEdge = ({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      if (animationFrame.current) {
+        cancelAnimationFrame(animationFrame.current)
+      }
     }
-  }, [onDrag, isLocked])
+  }, [onDrag, isLocked, applyInertia])
 
   const direction = new THREE.Vector3(
     end[0] - start[0],
@@ -282,12 +363,10 @@ const ConstellationEdge = ({
       ref={ref} 
       geometry={geometry}
       onPointerEnter={() => {
-        document.body.style.cursor = isLocked ? 'grab' : 'auto'
+        if (isLocked) document.body.style.cursor = 'grab'
       }}
       onPointerLeave={() => {
-        if (!dragging.current) {
-          document.body.style.cursor = isLocked ? 'grab' : 'auto'
-        }
+        if (!dragging.current) document.body.style.cursor = 'auto'
       }}
       onPointerDown={(e) => {
         if (isLocked) {
@@ -295,6 +374,9 @@ const ConstellationEdge = ({
           dragging.current = true
           document.body.style.cursor = 'grabbing'
           previousPosition.current = [e.clientX, e.clientY]
+          lastDelta.current = [0, 0]
+          velocity.current = [0, 0]
+          lastTime.current = Date.now()
         }
       }}
     >
@@ -302,7 +384,7 @@ const ConstellationEdge = ({
         color={animated ? "#6366F1" : "#4B5563"}
         transparent={animated}
         opacity={animated ? 0.5 : 1}
-        linewidth={2}
+        linewidth={1}
       />
     </line>
   )
@@ -367,17 +449,15 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   }, [nodePositions, isLocked])
 
   const handleNodeSelect = useCallback((nodeId: string) => {
-    if (controlsRef.current && camera) {
+    if (controlsRef.current && camera && !isLocked) {
       const position = nodePositions.get(nodeId)
       if (position) {
-        // Store current camera position relative to selected node
         const offset = new THREE.Vector3(
           camera.position.x - position[0],
           camera.position.y - position[1],
           camera.position.z - position[2]
         )
         
-        // Update orbit controls to center on selected node
         controlsRef.current.target.set(...position)
         camera.position.set(
           position[0] + offset.x,
@@ -388,11 +468,13 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         controlsRef.current.update()
       }
     }
-  }, [nodePositions, camera])
+  }, [nodePositions, camera, isLocked])
 
   const handleNodeDragStart = useCallback(() => {
-    setDragInitialPositions(new Map(nodePositions))
-  }, [nodePositions])
+    if (isLocked) {
+      setDragInitialPositions(new Map(nodePositions))
+    }
+  }, [nodePositions, isLocked])
 
   const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
     if (isLocked) {
@@ -424,6 +506,22 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       })
     }
   }, [isLocked, dragInitialPositions])
+
+  const handleEdgeDrag = useCallback((delta: [number, number, number]) => {
+    if (isLocked) {
+      setNodePositions(prev => {
+        const updated = new Map()
+        prev.forEach((pos, id) => {
+          updated.set(id, [
+            pos[0] + delta[0],
+            pos[1] + delta[1],
+            pos[2] + delta[2]
+          ])
+        })
+        return updated
+      })
+    }
+  }, [isLocked])
 
   const handleZoomIn = useCallback(() => {
     if (controlsRef.current && camera) {
@@ -461,6 +559,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       controlsRef.current.target.set(0, 0, 0)
       camera.updateProjectionMatrix()
       controlsRef.current.update()
+      setActiveNode(null)
+      setSelectedNode(null)
     }
   }, [camera])
 
@@ -481,22 +581,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }))
   }, [nodes, nodePositions])
 
-  const handleEdgeDrag = useCallback((delta: [number, number, number]) => {
-    if (isLocked) {
-      setNodePositions(prev => {
-        const updated = new Map()
-        prev.forEach((pos, id) => {
-          updated.set(id, [
-            pos[0] + delta[0],
-            pos[1] + delta[1],
-            pos[2] + delta[2]
-          ])
-        })
-        return updated
-      })
-    }
-  }, [isLocked])
-
   useEffect(() => {
     if (isLocked) {
       document.body.style.cursor = 'grab'
@@ -511,7 +595,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
       className="relative w-full h-[800px] bg-gray-950 rounded-lg overflow-hidden"
-      style={{ cursor: isLocked ? 'grab' : 'auto' }}
     >
       <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
         <button
