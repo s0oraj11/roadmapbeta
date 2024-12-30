@@ -236,14 +236,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }
   }, [nodePositions])
 
-  const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
-    setNodePositions(prev => {
-      const updated = new Map(prev)
-      updated.set(nodeId, newPosition)
-      return updated
-    })
-  }, [])
-
   const handleZoomIn = useCallback(() => {
     if (controlsRef.current && camera) {
       const zoomFactor = 0.75
