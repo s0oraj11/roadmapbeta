@@ -23,18 +23,13 @@ interface StellarRoadmapProps {
   nodes: FlowNode[]
   edges: FlowEdge[]
 }
-interface Position3D {
-  x: number
-  y: number
-  z: number
-}
+
 const StellarNode = ({ 
   node,
   position,
   isActive,
   onClick,
   onDrag,
-  onDragEnd,
 }: { 
   node: NodeType
   position: [number, number, number]
@@ -75,11 +70,8 @@ const StellarNode = ({
       previousPosition.current = [event.clientX, event.clientY]
     }
 
- const handleMouseUp = () => {
-      if (dragging.current) {
-        dragging.current = false
-        onDragEnd()
-      }
+    const handleMouseUp = () => {
+      dragging.current = false
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
@@ -93,7 +85,7 @@ const StellarNode = ({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [position, onDrag, onDragEnd])
+  }, [position, onDrag, camera])
   
   return (
     <group
@@ -236,6 +228,14 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }
   }, [nodePositions])
 
+  const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
+    setNodePositions(prev => {
+      const updated = new Map(prev)
+      updated.set(nodeId, newPosition)
+      return updated
+    })
+  }, [])
+
   const handleZoomIn = useCallback(() => {
     if (controlsRef.current && camera) {
       const zoomFactor = 0.75
@@ -292,56 +292,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }))
   }, [nodes, nodePositions])
 
-  const [isGroupDragEnabled, setIsGroupDragEnabled] = useState(false)
-  const groupDragStartPosition = useRef<Position3D | null>(null)
-  const groupDragStartNodes = useRef<Map<string, [number, number, number]> | null>(null)
-
-  // Add to the existing handleNodeDrag function
-  const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
-    if (isGroupDragEnabled) {
-      if (!groupDragStartPosition.current) {
-        groupDragStartPosition.current = {
-          x: newPosition[0],
-          y: newPosition[1],
-          z: newPosition[2]
-        }
-        groupDragStartNodes.current = new Map(nodePositions)
-        return
-      }
-
-      const deltaX = newPosition[0] - groupDragStartPosition.current.x
-      const deltaY = newPosition[1] - groupDragStartPosition.current.y
-      const deltaZ = newPosition[2] - groupDragStartPosition.current.z
-
-      setNodePositions(prev => {
-        const updated = new Map(prev)
-        groupDragStartNodes.current?.forEach((startPos, id) => {
-          updated.set(id, [
-            startPos[0] + deltaX,
-            startPos[1] + deltaY,
-            startPos[2] + deltaZ
-          ])
-        })
-        return updated
-      })
-    } else {
-      setNodePositions(prev => {
-        const updated = new Map(prev)
-        updated.set(nodeId, newPosition)
-        return updated
-      })
-    }
-  }, [isGroupDragEnabled])
-
-  // Add cleanup for group drag
-  const handleGroupDragEnd = useCallback(() => {
-    groupDragStartPosition.current = null
-    groupDragStartNodes.current = null
-  }, [])
-
-
-
-  
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
@@ -350,17 +300,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       className="relative w-full h-[800px] bg-gray-950 rounded-lg overflow-hidden"
     >
       <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
-       <button
-          onClick={() => setIsGroupDragEnabled(!isGroupDragEnabled)}
-          className="p-2 hover:bg-gray-700 rounded"
-          title={isGroupDragEnabled ? "Disable Group Drag" : "Enable Group Drag"}
-        >
-          {isGroupDragEnabled ? (
-            <Unlock className="text-white" size={24} />
-          ) : (
-            <Lock className="text-white" size={24} />
-          )}
-        </button> 
         <button
           onClick={handleZoomIn}
           className="p-2 hover:bg-gray-700 rounded"
@@ -443,7 +382,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         })}
 
 
-        {nodes.map(node => {
+                                             {nodes.map(node => {
           const position = nodePositions.get(node.id)
           if (position) {
             return (
@@ -453,10 +392,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                 position={position}
                 isActive={node.id === activeNode}
                 onClick={() => handleNodeClick(node.id)}
-                onDrag={(newPos) => {
-                  handleNodeDrag(node.id, newPos)
-                }}
-                onDragEnd={handleGroupDragEnd}
+                onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
               />
             )
           }
