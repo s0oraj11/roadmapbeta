@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { Node as FlowNode, Edge as FlowEdge } from '@xyflow/react'
 import { StellarNode } from './StellarNode'
 import { ConstellationEdge } from './ConstellationEdge'
+import { NodeType, EdgeType } from './types'
 
 interface StellarRoadmapProps {
   nodes: FlowNode[]
