@@ -1,38 +1,37 @@
 // src/components/stellar/StellarRoadmap.tsx
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import { motion } from 'framer-motion'
 import * as THREE from 'three'
-
-import { StellarNode } from './nodes/StellarNode'
-import { ConstellationEdge } from './edges/ConstellationEdge'
-import { CameraController } from './camera/CameraController'
-import { ControlPanel } from './controls/ControlPanel'
-import { Minimap } from './minimap/Minimap'
 import { NodeType, EdgeType, StellarRoadmapProps } from './types'
+import CameraController from './camera/CameraController'
+import ControlPanel from './controls/ControlPanel'
+import ConstellationEdge from './edges/ConstellationEdge'
+import Minimap from './minimap/Minimap'
+import StellarNode from './nodes/StellarNode'
 
 const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges: flowEdges }) => {
   const nodes: NodeType[] = useMemo(() => flowNodes.map(node => ({
     id: node.id,
     data: node.data,
     position: node.position,
-    className: node.className
+    className: node.className,
+    type: node.type
   })), [flowNodes])
   
   const edges: EdgeType[] = useMemo(() => flowEdges.map(edge => ({
     id: edge.id,
     source: edge.source,
     target: edge.target,
-    animated: edge.animated
+    animated: edge.animated,
+    type: edge.type
   })), [flowEdges])
 
   const [activeNode, setActiveNode] = useState<string | null>(null)
   const controlsRef = useRef<any>()
   const [camera, setCamera] = useState<THREE.Camera | null>(null)
   const initialCameraPosition = useRef<THREE.Vector3 | null>(null)
-  const [selectedNode, setSelectedNode] = useState<string | null>(null)
-  const [isLocked, setIsLocked] = useState(false)
   
   const [nodePositions, setNodePositions] = useState(() => new Map(nodes.map(node => [
     node.id,
@@ -42,6 +41,9 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       0
     ] as [number, number, number]
   ])))
+
+  const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [isLocked, setIsLocked] = useState(false)
 
   const handleNodeClick = useCallback((nodeId: string) => {
     if (!isLocked) {
@@ -57,15 +59,132 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }
   }, [nodePositions, isLocked])
 
-  // ... (other handlers remain the same)
+  const handleNodeSelect = useCallback((nodeId: string) => {
+    if (controlsRef.current && camera && !isLocked) {
+      const position = nodePositions.get(nodeId)
+      if (position) {
+        const offset = new THREE.Vector3(
+          camera.position.x - position[0],
+          camera.position.y - position[1],
+          camera.position.z - position[2]
+        )
+        
+        controlsRef.current.target.set(...position)
+        camera.position.set(
+          position[0] + offset.x,
+          position[1] + offset.y,
+          position[2] + offset.z
+        )
+        camera.updateProjectionMatrix()
+        controlsRef.current.update()
+      }
+    }
+  }, [nodePositions, camera, isLocked])
+
+  const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
+    setNodePositions(prev => {
+      const updated = new Map(prev)
+      if (isLocked) {
+        const delta = [
+          newPosition[0] - (prev.get(nodeId)?.[0] ?? 0),
+          newPosition[1] - (prev.get(nodeId)?.[1] ?? 0),
+          newPosition[2] - (prev.get(nodeId)?.[2] ?? 0),
+        ]
+        prev.forEach((pos, id) => {
+          updated.set(id, [
+            pos[0] + delta[0],
+            pos[1] + delta[1],
+            pos[2] + delta[2]
+          ])
+        })
+      } else {
+        updated.set(nodeId, newPosition)
+      }
+      return updated
+    })
+  }, [isLocked])
+
+  const handleEdgeDrag = useCallback((delta: [number, number, number]) => {
+    if (isLocked) {
+      setNodePositions(prev => {
+        const updated = new Map()
+        prev.forEach((pos, id) => {
+          updated.set(id, [
+            pos[0] + delta[0],
+            pos[1] + delta[1],
+            pos[2] + delta[2]
+          ])
+        })
+        return updated
+      })
+    }
+  }, [isLocked])
+
+  const handleZoomIn = useCallback(() => {
+    if (controlsRef.current && camera) {
+      const zoomFactor = 0.75
+      const currentDistance = camera.position.distanceTo(controlsRef.current.target)
+      const newDistance = Math.max(currentDistance * zoomFactor, controlsRef.current.minDistance)
+      
+      const direction = camera.position.clone().sub(controlsRef.current.target).normalize()
+      const newPosition = controlsRef.current.target.clone().add(direction.multiplyScalar(newDistance))
+      
+      camera.position.copy(newPosition)
+      camera.updateProjectionMatrix()
+      controlsRef.current.update()
+    }
+  }, [camera])
+
+  const handleZoomOut = useCallback(() => {
+    if (controlsRef.current && camera) {
+      const zoomFactor = 1.25
+      const currentDistance = camera.position.distanceTo(controlsRef.current.target)
+      const newDistance = Math.min(currentDistance * zoomFactor, controlsRef.current.maxDistance)
+      
+      const direction = camera.position.clone().sub(controlsRef.current.target).normalize()
+      const newPosition = controlsRef.current.target.clone().add(direction.multiplyScalar(newDistance))
+      
+      camera.position.copy(newPosition)
+      camera.updateProjectionMatrix()
+      controlsRef.current.update()
+    }
+  }, [camera])
+
+  const handleReset = useCallback(() => {
+    if (controlsRef.current && initialCameraPosition.current && camera) {
+      camera.position.copy(initialCameraPosition.current)
+      controlsRef.current.target.set(0, 0, 0)
+      camera.updateProjectionMatrix()
+      controlsRef.current.update()
+      setActiveNode(null)
+      setSelectedNode(null)
+      setNodePositions(new Map(nodes.map(node => [
+        node.id,
+        [
+          node.position.x / 25 - 8,
+          node.position.y / 25 + 8,
+          0
+        ] as [number, number, number]
+      ])))
+    }
+  }, [camera, nodes])
+
+  const handleCameraReady = useCallback((camera: THREE.Camera) => {
+    setCamera(camera)
+    if (!initialCameraPosition.current) {
+      initialCameraPosition.current = new THREE.Vector3(0, 0, 15)
+    }
+  }, [])
 
   useEffect(() => {
-    const setCursor = () => {
-      document.body.style.cursor = isLocked ? 'grab' : 'auto'
+    if (typeof window !== 'undefined') {
+      const setCursor = () => {
+        document.body.style.cursor = isLocked ? 'grab' : 'auto'
+      }
+      setCursor()
+      window.addEventListener('mousemove', setCursor)
+      return () => window.removeEventListener('mousemove', setCursor)
     }
-    setCursor()
-    window.addEventListener('mousemove', setCursor)
-    return () => window.removeEventListener('mousemove', setCursor)
   }, [isLocked])
 
   return (
@@ -85,8 +204,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 
       <Minimap
         nodes={nodes}
-        activeNode={activeNode}
         nodePositions={nodePositions}
+        activeNode={activeNode}
       />
 
       <Canvas>
@@ -156,43 +275,3 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 }
 
 export default StellarRoadmap
-
-// src/pages/index.tsx
-import React, { Suspense, lazy } from 'react'
-import { motion } from 'framer-motion'
-import { initialNodes, initialEdges } from '@/components/stellar/data/roadmapData'
-
-const StellarRoadmap = lazy(() => import('@/components/stellar/StellarRoadmap'))
-
-const Index = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
-      <div className="max-w-7xl mx-auto p-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
-        >
-          <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-300">
-            NeetCode.io Roadmap
-          </h1>
-          <p className="text-gray-300 text-lg">
-            Master data structures and algorithms with this structured learning path
-          </p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-        >
-          <Suspense fallback={<div className="text-white text-center">Loading roadmap...</div>}>
-            <StellarRoadmap nodes={initialNodes} edges={initialEdges} />
-          </Suspense>
-        </motion.div>
-      </div>
-    </div>
-  )
-}
-
-export default Index
