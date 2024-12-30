@@ -2,7 +2,7 @@ import React, { Suspense, lazy } from 'react'
 import { motion } from 'framer-motion'
 import { initialNodes, initialEdges } from '@/components/roadmapData'
 
-const StellarRoadmap = lazy(() => import('@/components/StellarRoadmap'))
+const StellarRoadmap = lazy(() => import('@/components/stellar-node/index'))
 
 const Index = () => {
   return (
