@@ -212,7 +212,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     node.id,
     [
       node.position.x / 25 - 8,
-      -node.position.y / 25 + 8,
+      node.position.y / 25 + 8,
       0
     ] as [number, number, number]
   ])))
