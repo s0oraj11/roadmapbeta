@@ -17,6 +17,7 @@ interface EdgeType {
   source: string
   target: string
   animated?: boolean
+  style?: { stroke?: string }
 }
 
 interface StellarRoadmapProps {
@@ -41,6 +42,7 @@ const StellarNode = ({
   const { camera } = useThree()
   const isPrimary = node.className === 'start-node'
   const isPattern = node.className === 'pattern-node'
+  const isSubPattern = node.className === 'subpattern-node'
   const dragging = useRef(false)
   const previousPosition = useRef([0, 0])
   
@@ -50,8 +52,8 @@ const StellarNode = ({
     }
   })
 
-  const nodeScale = isPrimary ? 1.2 : isPattern ? 1 : 0.8
-  const nodeColor = isPrimary ? "#FFD700" : isPattern ? "#6366F1" : "#4B5563"
+  const nodeScale = isPrimary ? 1.2 : isPattern ? 1 : isSubPattern ? 0.7 : 0.8
+  const nodeColor = isPrimary ? "#FFD700" : isPattern ? "#6366F1" : isSubPattern ? "#06B6D4" : "#4B5563"
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -109,8 +111,8 @@ const StellarNode = ({
           color={isActive ? "#60A5FA" : nodeColor}
           metalness={0.8}
           roughness={0.2}
-          emissive={isPrimary || isPattern ? nodeColor : "#000000"}
-          emissiveIntensity={isPrimary ? 0.5 : isPattern ? 0.3 : 0}
+          emissive={isPrimary || isPattern || isSubPattern ? nodeColor : "#000000"}
+          emissiveIntensity={isPrimary ? 0.5 : isPattern ? 0.3 : isSubPattern ? 0.2 : 0}
         />
       </mesh>
       <Html center distanceFactor={15}>
@@ -120,6 +122,8 @@ const StellarNode = ({
             ? 'bg-yellow-500/20 text-yellow-200' 
             : node.className === 'pattern-node'
             ? 'bg-indigo-500/20 text-indigo-200'
+            : node.className === 'subpattern-node'
+            ? 'bg-cyan-500/20 text-cyan-200'
             : 'bg-gray-800/90 text-white'}
         `}>
           {node.data.label}
@@ -132,11 +136,13 @@ const StellarNode = ({
 const ConstellationEdge = ({ 
   start, 
   end,
-  animated
+  animated,
+  style
 }: { 
   start: [number, number, number]
   end: [number, number, number]
   animated?: boolean
+  style?: { stroke?: string }
 }) => {
   const ref = useRef<THREE.Line>(null)
   
@@ -168,7 +174,7 @@ const ConstellationEdge = ({
   return (
     <line ref={ref} geometry={geometry}>
       <lineBasicMaterial 
-        color={animated ? "#6366F1" : "#4B5563"}
+        color={style?.stroke || (animated ? "#6366F1" : "#4B5563")}
         transparent={animated}
         opacity={animated ? 0.5 : 1}
         linewidth={1}
@@ -200,7 +206,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     id: edge.id,
     source: edge.source,
     target: edge.target,
-    animated: edge.animated
+    animated: edge.animated,
+    style: edge.style
   }))
 
   const [activeNode, setActiveNode] = useState<string | null>(null)
@@ -338,6 +345,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                   ? 'bg-yellow-400'
                   : node.className === 'pattern-node'
                   ? 'bg-indigo-400'
+                  : node.className === 'subpattern-node'
+                  ? 'bg-cyan-400'
                   : 'bg-gray-400'
                 }`}
               style={{
@@ -350,7 +359,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       </div>
 
       <Canvas>
-        
         <CameraController onCameraReady={handleCameraReady} />
         <color attach="background" args={['#030712']} />
         <ambientLight intensity={0.4} />
@@ -375,14 +383,14 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                 start={startPos}
                 end={endPos}
                 animated={edge.animated}
+                style={edge.style}
               />
             )
           }
           return null
         })}
 
-
-                                             {nodes.map(node => {
+        {nodes.map(node => {
           const position = nodePositions.get(node.id)
           if (position) {
             return (
