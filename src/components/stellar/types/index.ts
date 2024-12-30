@@ -1,5 +1,4 @@
 // src/components/stellar/types/index.ts
-
 import { Node as FlowNode, Edge as FlowEdge } from '@xyflow/react'
 import * as THREE from 'three'
 
@@ -8,6 +7,7 @@ export interface NodeType {
   data: { label: string }
   position: { x: number; y: number }
   className?: string
+  type?: string
 }
 
 export interface EdgeType {
@@ -15,6 +15,7 @@ export interface EdgeType {
   source: string
   target: string
   animated?: boolean
+  type?: string
 }
 
 export interface StellarRoadmapProps {
@@ -22,7 +23,7 @@ export interface StellarRoadmapProps {
   edges: FlowEdge[]
 }
 
-export interface StellarNodeProps {
+export interface NodeProps {
   node: NodeType
   position: [number, number, number]
   isActive: boolean
@@ -32,7 +33,7 @@ export interface StellarNodeProps {
   onSelect: () => void
 }
 
-export interface ConstellationEdgeProps {
+export interface EdgeProps {
   start: [number, number, number]
   end: [number, number, number]
   animated?: boolean
@@ -42,4 +43,18 @@ export interface ConstellationEdgeProps {
 
 export interface CameraControllerProps {
   onCameraReady: (camera: THREE.Camera) => void
+}
+
+export interface MinimapProps {
+  nodes: NodeType[]
+  nodePositions: Map<string, [number, number, number]>
+  activeNode: string | null
+}
+
+export interface ControlPanelProps {
+  isLocked: boolean
+  onToggleLock: () => void
+  onZoomIn: () => void
+  onZoomOut: () => void
+  onReset: () => void
 }
