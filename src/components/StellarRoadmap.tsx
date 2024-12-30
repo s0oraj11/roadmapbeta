@@ -388,8 +388,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         </div>
       </div>
 
-      <Canvas>
-        
+      <Canvas onMouseDown={handleGroupDragStart}>
         <CameraController onCameraReady={handleCameraReady} />
         <color attach="background" args={['#030712']} />
         <ambientLight intensity={0.4} />
