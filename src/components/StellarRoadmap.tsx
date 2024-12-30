@@ -217,6 +217,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     ] as [number, number, number]
   ])))
 
+  const [isLocked, setIsLocked] = useState(false);
+
   const handleNodeClick = useCallback((nodeId: string) => {
     setActiveNode(nodeId)
     if (controlsRef.current) {
@@ -230,11 +232,30 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 
   const handleNodeDrag = useCallback((nodeId: string, newPosition: [number, number, number]) => {
     setNodePositions(prev => {
-      const updated = new Map(prev)
-      updated.set(nodeId, newPosition)
-      return updated
-    })
-  }, [])
+      const updated = new Map(prev);
+      const dragDelta = [
+        newPosition[0] - (prev.get(nodeId)?.[0] ?? 0),
+        newPosition[1] - (prev.get(nodeId)?.[1] ?? 0),
+        newPosition[2] - (prev.get(nodeId)?.[2] ?? 0),
+      ];
+
+      if (isLocked) {
+        // Move all nodes together when locked
+        prev.forEach((pos, id) => {
+          updated.set(id, [
+            pos[0] + dragDelta[0],
+            pos[1] + dragDelta[1],
+            pos[2] + dragDelta[2],
+          ]);
+        });
+      } else {
+        // Move only the dragged node when unlocked
+        updated.set(nodeId, newPosition);
+      }
+      
+      return updated;
+    });
+  }, [isLocked]);
 
   const handleZoomIn = useCallback(() => {
     if (controlsRef.current && camera) {
@@ -326,6 +347,26 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         </button>
       </div>
 
+      <div className="absolute bottom-4 right-52 z-10 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
+        <button
+          onClick={() => setIsLocked(!isLocked)}
+          className="p-2 hover:bg-gray-700 rounded text-white"
+          title={isLocked ? "Unlock group drag" : "Lock for group drag"}
+        >
+          {isLocked ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+            </svg>
+          )}
+        </button>
+      </div>
+
       <div className="absolute bottom-4 right-4 z-10 w-48 h-48 bg-gray-800/80 rounded-lg border border-gray-700 p-2">
         <div className="relative w-full h-full">
           {updateMinimapPositions().map(node => (
@@ -413,3 +454,4 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 }
 
 export default StellarRoadmap
+
