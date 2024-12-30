@@ -98,8 +98,10 @@ const StellarNode = ({
       position={position}
       onClick={(e) => {
         e.stopPropagation()
-        onClick()
-        onSelect()
+        if (!isLocked) {
+          onClick()
+          onSelect()
+        }
       }}
       onPointerDown={(e) => {
         e.stopPropagation()
@@ -230,16 +232,18 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   const [dragInitialPositions, setDragInitialPositions] = useState<Map<string, [number, number, number]>>(new Map())
 
   const handleNodeClick = useCallback((nodeId: string) => {
-    setActiveNode(nodeId)
-    setSelectedNode(nodeId)
-    if (controlsRef.current) {
-      const position = nodePositions.get(nodeId)
-      if (position) {
-        controlsRef.current.target.set(...position)
-        controlsRef.current.update()
+    if (!isLocked) {
+      setActiveNode(nodeId)
+      setSelectedNode(nodeId)
+      if (controlsRef.current) {
+        const position = nodePositions.get(nodeId)
+        if (position) {
+          controlsRef.current.target.set(...position)
+          controlsRef.current.update()
+        }
       }
     }
-  }, [nodePositions])
+  }, [nodePositions, isLocked])
 
   const handleNodeSelect = useCallback((nodeId: string) => {
     if (controlsRef.current && camera) {
@@ -469,7 +473,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                 key={node.id}
                 node={node}
                 position={position}
-                isActive={node.id === activeNode}
+                isActive={!isLocked && node.id === activeNode}
                 onClick={() => handleNodeClick(node.id)}
                 onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
                 isLocked={isLocked}
