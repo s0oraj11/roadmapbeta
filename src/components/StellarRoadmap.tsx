@@ -400,17 +400,17 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         })}
 
         <OrbitControls
-          ref={controlsRef}
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          minDistance={10}
-          maxDistance={50}
-          maxPolarAngle={Math.PI} // Allow full vertical rotation
-          minPolarAngle={0}
-          maxAzimuthAngle={Math.PI * 2} // Allow full horizontal rotation
-          minAzimuthAngle={-Math.PI * 2}
-          makeDefault
+  ref={controlsRef}
+  enablePan={true}
+  enableZoom={true}
+  enableRotate={true}
+  minDistance={5}  // Reduce from 10 to allow closer zoom
+  maxDistance={30} // Reduce from 50 to keep objects more visible
+  maxPolarAngle={Math.PI * 2} // Allow full vertical rotation
+  minPolarAngle={-Math.PI * 2}
+  maxAzimuthAngle={Math.PI * 2} // Allow full horizontal rotation
+  minAzimuthAngle={-Math.PI * 2}
+  makeDefault
         />
       </Canvas>
     </motion.div>
