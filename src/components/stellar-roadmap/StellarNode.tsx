@@ -2,13 +2,7 @@ import React, { useRef, useCallback, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-
-interface NodeType {
-  id: string
-  data: { label: string }
-  position: { x: number; y: number }
-  className?: string
-}
+import { NodeType } from './types'
 
 interface StellarNodeProps {
   node: NodeType
@@ -28,7 +22,7 @@ export const StellarNode = React.memo(({
   onDrag,
   isLocked,
   onSelect,
-}: StellarNodeProps) => {
+}: StellarNodeProps) =>  {
   const meshRef = useRef<THREE.Mesh>(null)
   const { camera } = useThree()
   const isPrimary = node.className === 'start-node'
