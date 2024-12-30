@@ -104,12 +104,6 @@ const StellarNode = React.memo(({
         }
       }}
       onPointerDown={handlePointerDown}
-      onPointerEnter={() => {
-        document.body.style.cursor = isLocked ? 'grabbing' : 'pointer'
-      }}
-      onPointerLeave={() => {
-        document.body.style.cursor = isLocked ? 'grab' : 'auto'
-      }}
     >
       <mesh 
         ref={meshRef}
@@ -226,12 +220,6 @@ const ConstellationEdge = React.memo(({
       ref={ref} 
       geometry={geometry}
       onPointerDown={handlePointerDown}
-      onPointerEnter={() => {
-        if (isLocked) document.body.style.cursor = 'grabbing'
-      }}
-      onPointerLeave={() => {
-        if (isLocked) document.body.style.cursor = 'grab'
-      }}
     >
       <lineBasicMaterial 
         color={animated ? "#6366F1" : "#4B5563"}
@@ -428,22 +416,10 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   }, [nodes, nodePositions])
 
   useEffect(() => {
-    const setCursor = (e: MouseEvent) => {
-      const canvas = document.querySelector('canvas')
-      if (canvas) {
-        const rect = canvas.getBoundingClientRect()
-        const x = e.clientX - rect.left
-        const y = e.clientY - rect.top
-        const isOverCanvas = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height
-
-        if (isLocked) {
-          document.body.style.cursor = isOverCanvas ? 'grabbing' : 'grab'
-        } else {
-          document.body.style.cursor = isOverCanvas ? 'pointer' : 'auto'
-        }
-      }
+    const setCursor = () => {
+      document.body.style.cursor = isLocked ? 'grab' : 'auto'
     }
-
+    setCursor()
     window.addEventListener('mousemove', setCursor)
     return () => window.removeEventListener('mousemove', setCursor)
   }, [isLocked])
@@ -589,4 +565,3 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 }
 
 export default StellarRoadmap
-
