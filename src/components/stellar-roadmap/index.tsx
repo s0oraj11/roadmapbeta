@@ -182,8 +182,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         nodes={nodes}
         nodePositions={nodePositions}
         activeNode={activeNode}
-        camera={camera}
-        controls={controlsRef.current}
         />
 
       <Canvas>
