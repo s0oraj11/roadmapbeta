@@ -15,7 +15,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
   // Convert 3D positions to 2D minimap coordinates
   const projectToMinimap = (position: [number, number, number], width: number, height: number): [number, number] => {
     const [x, y] = position;
-    const padding = 20;
+    const padding = 30; // Increased padding to prevent cut-off
     
     // Find bounds of all nodes
     const positions = Array.from(nodePositions.values());
@@ -43,29 +43,30 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
+    // Set canvas size with higher resolution for crisp rendering
+    const scale = window.devicePixelRatio || 1;
+    canvas.width = container.clientWidth * scale;
+    canvas.height = container.clientHeight * scale;
+    ctx.scale(scale, scale);
 
     // Clear canvas
-    ctx.fillStyle = '#030712';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0f172a'; // Darker background matching the theme
+    ctx.fillRect(0, 0, canvas.width / scale, canvas.height / scale);
 
     // Draw connecting lines
-    ctx.strokeStyle = '#1f2937';
+    ctx.strokeStyle = '#1e293b'; // Slightly lighter lines for better visibility
     ctx.lineWidth = 1;
     nodes.forEach(node => {
       const startPos = nodePositions.get(node.id);
       if (!startPos) return;
 
-      const [startX, startY] = projectToMinimap(startPos, canvas.width, canvas.height);
+      const [startX, startY] = projectToMinimap(startPos, canvas.width / scale, canvas.height / scale);
       
-      // Draw connections based on node relationships
       nodes.forEach(targetNode => {
         const endPos = nodePositions.get(targetNode.id);
         if (!endPos) return;
 
-        const [endX, endY] = projectToMinimap(endPos, canvas.width, canvas.height);
+        const [endX, endY] = projectToMinimap(endPos, canvas.width / scale, canvas.height / scale);
         
         ctx.beginPath();
         ctx.moveTo(startX, startY);
@@ -79,11 +80,11 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
       const position = nodePositions.get(node.id);
       if (!position) return;
 
-      const [x, y] = projectToMinimap(position, canvas.width, canvas.height);
+      const [x, y] = projectToMinimap(position, canvas.width / scale, canvas.height / scale);
       
       // Draw planet
       ctx.beginPath();
-      ctx.arc(x, y, node.id === activeNode ? 6 : 4, 0, Math.PI * 2);
+      ctx.arc(x, y, node.id === activeNode ? 5 : 3.5, 0, Math.PI * 2);
       
       // Different colors for different node types
       if (node.id === 'start') {
@@ -99,7 +100,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
       // Highlight active node
       if (node.id === activeNode) {
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
       }
     });
@@ -111,11 +112,17 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
       ref={containerRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="absolute top-4 right-4 w-64 h-48 bg-gray-900/80 rounded-lg border border-gray-700 overflow-hidden"
+      className="absolute top-4 right-4 w-48 h-36 bg-gray-900/70 rounded-md border border-gray-800 overflow-hidden shadow-lg"
+      style={{
+        backdropFilter: 'blur(8px)',
+      }}
     >
       <canvas
         ref={canvasRef}
         className="w-full h-full"
+        style={{
+          display: 'block', // Removes bottom margin/space
+        }}
       />
     </motion.div>
   );
