@@ -178,12 +178,14 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         handleZoom={handleZoom}
         handleReset={handleReset}
       />
-
       <Minimap 
         nodes={nodes}
         nodePositions={nodePositions}
         activeNode={activeNode}
-      />
+        camera={camera}
+        controls={controlsRef.current}
+        onNodeSelect={handleNodeSelect}  // Uses your existing handleNodeSelect function
+        />
 
       <Canvas>
         <CameraController onCameraReady={handleCameraReady} />
