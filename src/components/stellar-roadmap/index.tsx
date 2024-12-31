@@ -26,12 +26,10 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     if (!isLocked) {
       setActiveNode(nodeId)
       setSelectedNode(nodeId)
-    }
-  }, [isLocked])
-
-  const handleNodeSelect = useCallback((nodeId: string) => {
-    if (!isLocked && cameraControlsRef.current) {
-      cameraControlsRef.current.focusPosition(nodeId)
+      const position = positionManagerRef.current?.nodePositions.get(nodeId)
+      if (position && cameraControlsRef.current) {
+        cameraControlsRef.current.focusPosition(position)
+      }
     }
   }, [isLocked])
 
@@ -40,11 +38,20 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       cameraControlsRef.current.reset()
       setActiveNode(null)
       setSelectedNode(null)
-      if (positionManagerRef.current?.resetPositions) {
+      if (positionManagerRef.current) {
         positionManagerRef.current.resetPositions()
       }
     }
   }, [])
+
+  const handleNodeSelect = useCallback((nodeId: string) => {
+    if (!isLocked && cameraControlsRef.current) {
+      const position = positionManagerRef.current?.nodePositions.get(nodeId)
+      if (position) {
+        cameraControlsRef.current.focusPosition(position)
+      }
+    }
+  }, [isLocked])
 
   useEffect(() => {
     const setCursor = () => {
@@ -62,7 +69,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       transition={{ duration: 0.5 }}
       className="relative w-full h-[800px] bg-gray-950 rounded-lg overflow-hidden"
     >
-      {/* Control buttons with SVG icons */}
       <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
         <button
           onClick={() => setIsLocked(!isLocked)}
@@ -125,7 +131,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
           initialNodes={flowNodes}
           isLocked={isLocked}
         >
-          {({ nodePositions, handleNodeDrag, handleEdgeDrag, updateMinimapPositions }) => (
+          {({ nodePositions, handleNodeDrag, handleEdgeDrag }) => (
             <>
               {flowEdges.map(edge => {
                 const startPos = nodePositions.get(edge.source)
@@ -153,7 +159,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                       key={node.id}
                       node={node}
                       position={position}
-                      isActive={!isLocked && node.id === activeNode}
+                      isActive={node.id === activeNode}
                       onClick={() => handleNodeClick(node.id)}
                       onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
                       isLocked={isLocked}
@@ -168,12 +174,13 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         </PositionManager>
       </Canvas>
 
-      {/* Minimap with proper positioning */}
       <div className="absolute bottom-4 right-4 z-10 w-48 h-48 bg-gray-800/80 rounded-lg border border-gray-700 p-2">
         <div className="relative w-full h-full">
-          {positionManagerRef.current?.updateMinimapPositions?.().map((node: FlowNode) => {
-            const nodePos = positionManagerRef.current?.getNodePosition?.(node.id)
+          {flowNodes.map(node => {
+            const nodePos = positionManagerRef.current?.nodePositions?.get(node.id)
             if (nodePos) {
+              const x = ((nodePos[0] + 8) * 48) / 16
+              const y = ((nodePos[1] - 8) * 48) / 16
               return (
                 <div
                   key={node.id}
@@ -187,8 +194,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                       : 'bg-gray-400'
                     }`}
                   style={{
-                    left: `${((nodePos[0] + 8) * 25 / 800) * 100}%`,
-                    top: `${((nodePos[1] - 8) * 25 / 800) * 100}%`,
+                    left: `${x}%`,
+                    top: `${y}%`,
                   }}
                 />
               )
