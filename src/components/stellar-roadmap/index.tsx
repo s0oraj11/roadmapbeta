@@ -19,6 +19,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState(false)
   const [camera, setCamera] = useState<THREE.Camera | null>(null)
+  const [nodePositions, setNodePositions] = useState<Map<string, [number, number, number]>>(new Map())
   const cameraControlsRef = useRef<any>()
   const positionManagerRef = useRef<any>()
 
@@ -26,12 +27,12 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     if (!isLocked) {
       setActiveNode(nodeId)
       setSelectedNode(nodeId)
-      const position = positionManagerRef.current?.nodePositions.get(nodeId)
+      const position = nodePositions.get(nodeId)
       if (position && cameraControlsRef.current) {
         cameraControlsRef.current.focusPosition(position)
       }
     }
-  }, [isLocked])
+  }, [isLocked, nodePositions])
 
   const handleReset = useCallback(() => {
     if (cameraControlsRef.current) {
@@ -44,14 +45,9 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }
   }, [])
 
-  const handleNodeSelect = useCallback((nodeId: string) => {
-    if (!isLocked && cameraControlsRef.current) {
-      const position = positionManagerRef.current?.nodePositions.get(nodeId)
-      if (position) {
-        cameraControlsRef.current.focusPosition(position)
-      }
-    }
-  }, [isLocked])
+  const handlePositionsUpdate = useCallback((positions: Map<string, [number, number, number]>) => {
+    setNodePositions(positions)
+  }, [])
 
   useEffect(() => {
     const setCursor = () => {
@@ -69,6 +65,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       transition={{ duration: 0.5 }}
       className="relative w-full h-[800px] bg-gray-950 rounded-lg overflow-hidden"
     >
+      {/* Control buttons */}
       <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
         <button
           onClick={() => setIsLocked(!isLocked)}
@@ -130,6 +127,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
           ref={positionManagerRef}
           initialNodes={flowNodes}
           isLocked={isLocked}
+          onPositionsChange={handlePositionsUpdate}
         >
           {({ nodePositions, handleNodeDrag, handleEdgeDrag }) => (
             <>
@@ -163,7 +161,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                       onClick={() => handleNodeClick(node.id)}
                       onDrag={(newPos) => handleNodeDrag(node.id, newPos)}
                       isLocked={isLocked}
-                      onSelect={() => handleNodeSelect(node.id)}
+                      onSelect={() => handleNodeClick(node.id)}
                     />
                   )
                 }
@@ -174,13 +172,12 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         </PositionManager>
       </Canvas>
 
+      {/* Minimap */}
       <div className="absolute bottom-4 right-4 z-10 w-48 h-48 bg-gray-800/80 rounded-lg border border-gray-700 p-2">
         <div className="relative w-full h-full">
           {flowNodes.map(node => {
-            const nodePos = positionManagerRef.current?.nodePositions?.get(node.id)
-            if (nodePos) {
-              const x = ((nodePos[0] + 8) * 48) / 16
-              const y = ((nodePos[1] - 8) * 48) / 16
+            const position = nodePositions.get(node.id)
+            if (position) {
               return (
                 <div
                   key={node.id}
@@ -194,8 +191,8 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
                       : 'bg-gray-400'
                     }`}
                   style={{
-                    left: `${x}%`,
-                    top: `${y}%`,
+                    left: `${((position[0] + 8) / 16) * 100}%`,
+                    top: `${((position[1] - 8) / 16) * 100}%`,
                   }}
                 />
               )
