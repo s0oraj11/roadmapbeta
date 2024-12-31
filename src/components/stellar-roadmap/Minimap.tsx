@@ -111,11 +111,22 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
   return (
     <motion.div
       ref={containerRef}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="absolute bottom-4 right-4 w-48 h-36 bg-gray-900/70 rounded-md border border-gray-800 overflow-hidden shadow-lg"
+      initial={{ opacity: 1 }} // Changed from 0 to 1
+      animate={{ 
+        opacity: 1,
+        y: 0    // Ensure it stays in position
+      }}
+      transition={{
+        duration: 0.3,
+        type: "spring",
+        stiffness: 260,
+        damping: 20
+      }}
+      className="fixed bottom-4 right-4 w-48 h-36 bg-gray-900/70 rounded-md border border-gray-800 overflow-hidden shadow-lg z-50" // Added z-50 and changed absolute to fixed
       style={{
         backdropFilter: 'blur(8px)',
+        willChange: 'transform', // Optimize performance
+        transform: 'translateZ(0)' // Force GPU acceleration
       }}
     >
       <canvas
@@ -123,6 +134,8 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
         className="w-full h-full"
         style={{
           display: 'block',
+          position: 'relative', // Ensure canvas stays within container
+          zIndex: 1
         }}
       />
     </motion.div>
