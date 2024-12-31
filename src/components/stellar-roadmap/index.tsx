@@ -184,7 +184,6 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         activeNode={activeNode}
         camera={camera}
         controls={controlsRef.current}
-        onNodeSelect={handleNodeSelect}  // Uses your existing handleNodeSelect function
         />
 
       <Canvas>
