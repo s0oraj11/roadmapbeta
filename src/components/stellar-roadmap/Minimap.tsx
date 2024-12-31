@@ -12,10 +12,10 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Convert 3D positions to 2D minimap coordinates
+  // Convert 3D positions to 2D minimap coordinates with reversed Y axis
   const projectToMinimap = (position: [number, number, number], width: number, height: number): [number, number] => {
     const [x, y] = position;
-    const padding = 30; // Increased padding to prevent cut-off
+    const padding = 30;
     
     // Find bounds of all nodes
     const positions = Array.from(nodePositions.values());
@@ -29,9 +29,10 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
     const scaleY = (height - 2 * padding) / (maxY - minY);
     const scale = Math.min(scaleX, scaleY);
     
+    // Flip the Y coordinate by subtracting from height
     return [
       padding + (x - minX) * scale,
-      padding + (y - minY) * scale
+      height - (padding + (y - minY) * scale) // Flip Y coordinate
     ];
   };
 
@@ -50,11 +51,11 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
     ctx.scale(scale, scale);
 
     // Clear canvas
-    ctx.fillStyle = '#0f172a'; // Darker background matching the theme
+    ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvas.width / scale, canvas.height / scale);
 
     // Draw connecting lines
-    ctx.strokeStyle = '#1e293b'; // Slightly lighter lines for better visibility
+    ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 1;
     nodes.forEach(node => {
       const startPos = nodePositions.get(node.id);
@@ -112,7 +113,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
       ref={containerRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="absolute top-4 right-4 w-48 h-36 bg-gray-900/70 rounded-md border border-gray-800 overflow-hidden shadow-lg"
+      className="absolute bottom-4 right-4 w-48 h-36 bg-gray-900/70 rounded-md border border-gray-800 overflow-hidden shadow-lg"
       style={{
         backdropFilter: 'blur(8px)',
       }}
@@ -121,7 +122,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
         ref={canvasRef}
         className="w-full h-full"
         style={{
-          display: 'block', // Removes bottom margin/space
+          display: 'block',
         }}
       />
     </motion.div>
