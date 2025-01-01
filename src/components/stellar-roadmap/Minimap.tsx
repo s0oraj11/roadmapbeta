@@ -194,32 +194,55 @@ const Minimap: React.FC<MinimapProps> = ({
   }, [nodes, edges, nodePositions, activeNode, camera, controls, is3D]);
 
   // Calculate viewport points for 2D projection
-  const getViewportPoints = (camera: THREE.Camera): THREE.Vector3[] => {
-    const frustum = new THREE.Frustum();
-    const projScreenMatrix = new THREE.Matrix4();
-    projScreenMatrix.multiplyMatrices(
-      camera.projectionMatrix,
-      camera.matrixWorldInverse
-    );
-    frustum.setFromProjectionMatrix(projScreenMatrix);
+  // Replace the existing getViewportPoints function with this:
+const getViewportPoints = (camera: THREE.Camera): THREE.Vector3[] => {
+  const frustum = new THREE.Frustum();
+  const projScreenMatrix = new THREE.Matrix4();
+  projScreenMatrix.multiplyMatrices(
+    camera.projectionMatrix,
+    camera.matrixWorldInverse
+  );
+  frustum.setFromProjectionMatrix(projScreenMatrix);
 
-    const near = camera.near;
-    const far = camera.far;
-    const aspect = camera.aspect;
-    const fov = (camera.fov * Math.PI) / 180;
-    const height = Math.tan(fov / 2);
-    const width = height * aspect;
+  // Get the visible height at the target distance
+  const fov = (camera.fov * Math.PI) / 180;
+  const targetDistance = camera.position.length();
+  const visibleHeight = 2 * Math.tan(fov / 2) * targetDistance;
+  const visibleWidth = visibleHeight * camera.aspect;
 
-    const points = [
-      new THREE.Vector3(-width * near, -height * near, -near),
-      new THREE.Vector3(width * near, -height * near, -near),
-      new THREE.Vector3(width * near, height * near, -near),
-      new THREE.Vector3(-width * near, height * near, -near),
-    ];
+  // Create viewport corners in world space
+  const position = new THREE.Vector3();
+  camera.getWorldPosition(position);
+  const direction = new THREE.Vector3(0, 0, -1);
+  direction.applyQuaternion(camera.quaternion);
 
-    return points.map(point => point.applyMatrix4(camera.matrixWorld));
-  };
+  const right = new THREE.Vector3(1, 0, 0);
+  right.applyQuaternion(camera.quaternion);
+  const up = new THREE.Vector3(0, 1, 0);
+  up.applyQuaternion(camera.quaternion);
 
+  const halfWidth = visibleWidth / 2;
+  const halfHeight = visibleHeight / 2;
+
+  // Calculate the four corners of the viewport
+  return [
+    position.clone().add(direction.clone().multiplyScalar(targetDistance))
+      .add(right.clone().multiplyScalar(-halfWidth))
+      .add(up.clone().multiplyScalar(-halfHeight)),
+    position.clone().add(direction.clone().multiplyScalar(targetDistance))
+      .add(right.clone().multiplyScalar(halfWidth))
+      .add(up.clone().multiplyScalar(-halfHeight)),
+    position.clone().add(direction.clone().multiplyScalar(targetDistance))
+      .add(right.clone().multiplyScalar(halfWidth))
+      .add(up.clone().multiplyScalar(halfHeight)),
+    position.clone().add(direction.clone().multiplyScalar(targetDistance))
+      .add(right.clone().multiplyScalar(-halfWidth))
+      .add(up.clone().multiplyScalar(halfHeight))
+  ];
+};
+
+
+  
   // Render 2D view
   const render2D = useMemo(() => {
     return () => {
