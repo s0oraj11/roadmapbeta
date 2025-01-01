@@ -127,8 +127,11 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
         backdropFilter: 'blur(8px)',
         willChange: 'transform', // Optimize performance
         transform: 'translateZ(0)' // Force GPU acceleration
+        position: 'absolute', // Explicitly set position
+        pointerEvents: 'auto'
       }}
     >
+      <div className="relative w-full h-full"> {/* Added wrapper div */}
       <canvas
         ref={canvasRef}
         className="w-full h-full"
@@ -138,6 +141,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
           zIndex: 1
         }}
       />
+      </div>
     </motion.div>
   );
 };
