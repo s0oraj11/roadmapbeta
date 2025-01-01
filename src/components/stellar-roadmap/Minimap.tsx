@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 
 interface MinimapProps {
   nodes: FlowNode[];
+  edges: FlowEdge[];
   nodePositions: Map<string, [number, number, number]>;
   activeNode: string | null;
 }
@@ -57,23 +58,19 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
     // Draw connecting lines
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 1;
-    nodes.forEach(node => {
-      const startPos = nodePositions.get(node.id);
-      if (!startPos) return;
-
-      const [startX, startY] = projectToMinimap(startPos, canvas.width / scale, canvas.height / scale);
+    nodes.forEach(edge => {
+      const startPos = nodePositions.get(edge.source);
+      const endPos = nodePositions.get(edge.target);
       
-      nodes.forEach(targetNode => {
-        const endPos = nodePositions.get(targetNode.id);
-        if (!endPos) return;
-
+      if (startPos && endPos) {
+        const [startX, startY] = projectToMinimap(startPos, canvas.width / scale, canvas.height / scale);
         const [endX, endY] = projectToMinimap(endPos, canvas.width / scale, canvas.height / scale);
         
         ctx.beginPath();
         ctx.moveTo(startX, startY);
         ctx.lineTo(endX, endY);
         ctx.stroke();
-      });
+      }
     });
 
     // Draw nodes as planets
@@ -106,7 +103,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
       }
     });
 
-  }, [nodes, nodePositions, activeNode]);
+  }, [nodes, edges, nodePositions, activeNode]);
 
   return (
     <motion.div
