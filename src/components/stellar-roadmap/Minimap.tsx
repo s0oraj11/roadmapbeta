@@ -193,32 +193,6 @@ const Minimap: React.FC<MinimapProps> = ({
     }
   }, [nodes, edges, nodePositions, activeNode, camera, controls, is3D]);
 
-  // Calculate viewport points for 2D projection
-  const getViewportPoints = (camera: THREE.Camera): THREE.Vector3[] => {
-    const frustum = new THREE.Frustum();
-    const projScreenMatrix = new THREE.Matrix4();
-    projScreenMatrix.multiplyMatrices(
-      camera.projectionMatrix,
-      camera.matrixWorldInverse
-    );
-    frustum.setFromProjectionMatrix(projScreenMatrix);
-
-    const near = camera.near;
-    const far = camera.far;
-    const aspect = camera.aspect;
-    const fov = (camera.fov * Math.PI) / 180;
-    const height = Math.tan(fov / 2);
-    const width = height * aspect;
-
-    const points = [
-      new THREE.Vector3(-width * near, -height * near, -near),
-      new THREE.Vector3(width * near, -height * near, -near),
-      new THREE.Vector3(width * near, height * near, -near),
-      new THREE.Vector3(-width * near, height * near, -near),
-    ];
-
-    return points.map(point => point.applyMatrix4(camera.matrixWorld));
-  };
 
 // Calculate viewport points for 2D projection
 const getViewportPoints = (camera: THREE.Camera): THREE.Vector3[] => {
