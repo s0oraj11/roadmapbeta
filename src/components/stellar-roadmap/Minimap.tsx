@@ -327,30 +327,33 @@ const getViewportPoints = (camera: THREE.Camera): THREE.Vector3[] => {
       });
 
       // Draw camera viewport
-      if (camera) {
-        const viewportPoints = getViewportPoints(camera);
-        const projectedPoints = viewportPoints.map(point => 
-          project([point.x, point.y, point.z])
-        );
+// In the render2D function, replace the camera viewport drawing section with:
+if (camera) {
+  const viewportPoints = getViewportPoints(camera);
+  const projectedPoints = viewportPoints.map(point => 
+    project([point.x, point.y, point.z])
+  );
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.lineDashOffset = (Date.now() / 50) % 8;
+  // Draw filled rectangle with semi-transparent background
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.beginPath();
+  ctx.moveTo(projectedPoints[0][0], projectedPoints[0][1]);
+  projectedPoints.forEach(([x, y]) => {
+    ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  ctx.fill();
 
-        ctx.beginPath();
-        ctx.moveTo(projectedPoints[0][0], projectedPoints[0][1]);
-        projectedPoints.forEach(([x, y]) => {
-          ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-        ctx.stroke();
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.fill();
-      }
-    };
-  }, [nodes, edges, nodePositions, activeNode, camera, is3D]);
+  // Draw dashed border
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.lineDashOffset = (Date.now() / 50) % 8;
+  ctx.stroke();
+  
+  // Reset line dash
+  ctx.setLineDash([]);
+}
 
   // Animation loop
   useEffect(() => {
