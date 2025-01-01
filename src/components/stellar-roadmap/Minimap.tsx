@@ -43,43 +43,66 @@ const Minimap: React.FC<MinimapProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   // Initialize 3D scene
-  useEffect(() => {
-    if (!containerRef.current || !is3D) return;
+useEffect(() => {
+  if (!containerRef.current || !is3D) return;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#0f172a');
-    sceneRef.current = scene;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // Create scene
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#0f172a');
+  sceneRef.current = scene;
 
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true,
-      alpha: true
-    });
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(192, 144);
-    containerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
+  // Create renderer with new color space setting
+  const renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    alpha: true,
+    powerPreference: "high-performance"
+  });
+  
+  // Configure renderer
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(192, 144);
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
-    minimapCamera.position.set(0, 15, 15);
-    minimapCamera.lookAt(0, 0, 0);
-    minimapCameraRef.current = minimapCamera;
+  containerRef.current.appendChild(renderer.domElement);
+  rendererRef.current = renderer;
 
-    const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
-    minimapControls.enableDamping = true;
-    minimapControls.dampingFactor = 0.05;
-    minimapControls.rotateSpeed = 0.5;
-    minimapControls.zoomSpeed = 0.5;
-    minimapControlsRef.current = minimapControls;
+  // Create and configure camera
+  const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
+  minimapCamera.position.set(0, 15, 15);
+  minimapCamera.lookAt(0, 0, 0);
+  minimapCameraRef.current = minimapCamera;
 
-    return () => {
-      minimapControls.dispose();
-      renderer.dispose();
-      containerRef.current?.removeChild(renderer.domElement);
-    };
-  }, [is3D]);
+  // Create controls
+  const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
+  minimapControls.enableDamping = true;
+  minimapControls.dampingFactor = 0.05;
+  minimapControls.rotateSpeed = 0.5;
+  minimapControls.zoomSpeed = 0.5;
+  minimapControlsRef.current = minimapControls;
+
+  // Add lights
+  const ambientLight = new THREE.AmbientLight('#ffffff', 0.2);
+  scene.add(ambientLight);
+
+  const directionalLight = new THREE.DirectionalLight('#ffffff', 0.8);
+  directionalLight.position.set(5, 5, 5);
+  scene.add(directionalLight);
+
+  return () => {
+    minimapControls.dispose();
+    renderer.dispose();
+    if (containerRef.current) {
+      containerRef.current.removeChild(renderer.domElement);
+    }
+    // Clean up lights
+    scene.remove(ambientLight);
+    scene.remove(directionalLight);
+  };
+}, [is3D]);
 
   // Setup 2D canvas
   useEffect(() => {
@@ -120,6 +143,9 @@ const Minimap: React.FC<MinimapProps> = ({
 
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(...position);
+      sphere.material = material;
+      sphere.castShadow = true;
+      sphere.receiveShadow = true;
       
       if (node.id === activeNode) {
         const glowGeometry = new THREE.SphereGeometry(0.4, 16, 16);
