@@ -355,6 +355,12 @@ if (camera) {
   ctx.setLineDash([]);
 }
 
+
+
+      
+    };
+  }, [nodes, edges, nodePositions, activeNode, camera, is3D]);
+
   // Animation loop
   useEffect(() => {
     let animationFrame: number;
