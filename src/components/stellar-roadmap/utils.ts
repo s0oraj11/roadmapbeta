@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { NodeType } from './types'
 
 export const CAMERA_SETTINGS = {
-  INITIAL_POSITION: [0, 0, 15] as const,
+  INITIAL_POSITION: [0, 5, 25] as const,
   MIN_DISTANCE: 5,
   MAX_DISTANCE: 100,
   ZOOM_IN_FACTOR: 0.75,
@@ -19,19 +19,40 @@ export const MINIMAP_CONFIG = {
 
 export const NODE_TRANSFORM = {
   SCALE_FACTOR: 25,
-  OFFSET_X: 8,
-  OFFSET_Y: 8
+  OFFSET_X: 0,  
+  OFFSET_Y: -4  
 }
 
 export const calculateNodePositions = (nodes: NodeType[]) => {
-  return new Map(nodes.map(node => [
+  // First calculate all positions
+  const positions = new Map(nodes.map(node => [
     node.id,
     [
       node.position.x / NODE_TRANSFORM.SCALE_FACTOR - NODE_TRANSFORM.OFFSET_X,
-      node.position.y / NODE_TRANSFORM.SCALE_FACTOR + NODE_TRANSFORM.OFFSET_Y,
+      node.position.y / NODE_TRANSFORM.SCALE_FACTOR - NODE_TRANSFORM.OFFSET_Y,
       0
     ] as [number, number, number]
   ]))
+
+  // Calculate center of all nodes
+  let centerX = 0, centerY = 0
+  positions.forEach(pos => {
+    centerX += pos[0]
+    centerY += pos[1]
+  })
+  centerX /= positions.size
+  centerY /= positions.size
+
+  // Adjust all positions relative to center
+  positions.forEach((pos, id) => {
+    positions.set(id, [
+      pos[0] - centerX,
+      pos[1] - centerY,
+      pos[2]
+    ] as [number, number, number])
+  })
+
+  return positions
 }
 
 export const updateMinimapPosition = (node: NodeType, position: { x: number, y: number }) => ({
