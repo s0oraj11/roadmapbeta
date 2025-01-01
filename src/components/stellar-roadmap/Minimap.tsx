@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { motion } from 'framer-motion';
-import { Card } from '@/components/ui/card';
 
 interface Node {
   id: string;
@@ -12,6 +11,13 @@ interface Node {
 interface Edge {
   source: string;
   target: string;
+}
+
+interface Bounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
 }
 
 interface MinimapProps {
@@ -51,28 +57,35 @@ const Minimap: React.FC<MinimapProps> = ({
 
     // Setup scene
     const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#0f172a');
     sceneRef.current = scene;
 
     // Setup renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: true 
+    });
     renderer.setSize(192, 144);
-    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(window.devicePixelRatio);
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Setup camera
-    const camera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
-    camera.position.set(5, 5, 5);
-    camera.lookAt(0, 0, 0);
-    minimapCameraRef.current = camera;
+    // Setup camera with improved positioning
+    const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
+    minimapCamera.position.set(5, 5, 5);
+    minimapCamera.lookAt(0, 0, 0);
+    minimapCameraRef.current = minimapCamera;
 
-    // Setup controls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    minimapControlsRef.current = controls;
+    // Setup controls with better damping
+    const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
+    minimapControls.enableDamping = true;
+    minimapControls.dampingFactor = 0.05;
+    minimapControls.rotateSpeed = 0.5;
+    minimapControls.zoomSpeed = 0.5;
+    minimapControls.enablePan = false;
+    minimapControlsRef.current = minimapControls;
 
-    // Add lights
+    // Add improved lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
     
@@ -80,18 +93,43 @@ const Minimap: React.FC<MinimapProps> = ({
     directionalLight.position.set(10, 10, 10);
     scene.add(directionalLight);
 
-    // Cleanup function
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
       renderer.dispose();
-      controls.dispose();
+      minimapControls.dispose();
       if (containerRef.current?.contains(renderer.domElement)) {
         containerRef.current.removeChild(renderer.domElement);
       }
     };
   }, [is3D]);
+
+  // Create frustum visualization
+  const createFrustumVisualization = (camera: THREE.Camera) => {
+    const frustumGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.LineBasicMaterial({
+      color: '#ffffff',
+      opacity: 0.4,
+      transparent: true,
+    });
+    
+    const wireframeMaterial = new THREE.LineBasicMaterial({
+      color: '#ffffff',
+      opacity: 0.2,
+      transparent: true,
+    });
+
+    const frustumMesh = new THREE.Mesh(frustumGeometry, material);
+    const wireframe = new THREE.LineSegments(
+      new THREE.WireframeGeometry(frustumGeometry),
+      wireframeMaterial
+    );
+    
+    frustumMesh.add(wireframe);
+    
+    return frustumMesh;
+  };
 
   // Update 3D scene
   useEffect(() => {
@@ -99,32 +137,42 @@ const Minimap: React.FC<MinimapProps> = ({
 
     const scene = sceneRef.current;
     const renderer = rendererRef.current;
-    const camera = minimapCameraRef.current;
-    const controls = minimapControlsRef.current;
+    const minimapCamera = minimapCameraRef.current;
 
-    // Clear existing nodes and edges
+    // Clear existing objects
     while(scene.children.length > 0) {
       scene.remove(scene.children[0]);
     }
 
-    // Add nodes
+    // Add nodes with improved materials
     nodes.forEach(node => {
       const position = nodePositions.get(node.id);
       if (!position) return;
 
-      const geometry = new THREE.SphereGeometry(0.1, 32, 32);
+      const geometry = new THREE.SphereGeometry(0.3, 32, 32);
       const material = new THREE.MeshPhongMaterial({ 
-        color: node.id === activeNode ? 0xffffff : 
-               node.id === 'start' ? 0xfbbf24 :
-               node.className?.includes('pattern') ? 0x818cf8 : 
-               0x22d3ee
+        color: getNodeColor(node, activeNode),
+        emissive: getNodeColor(node, activeNode),
+        emissiveIntensity: 0.2
       });
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(...position);
+      
+      if (node.id === activeNode) {
+        const glowGeometry = new THREE.SphereGeometry(0.4, 32, 32);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+          color: '#ffffff',
+          transparent: true,
+          opacity: 0.3
+        });
+        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+        sphere.add(glow);
+      }
+      
       scene.add(sphere);
     });
 
-    // Add edges
+    // Add edges with glow effect
     edges.forEach(edge => {
       const startPos = nodePositions.get(edge.source);
       const endPos = nodePositions.get(edge.target);
@@ -136,22 +184,59 @@ const Minimap: React.FC<MinimapProps> = ({
         ];
         
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const material = new THREE.LineBasicMaterial({ 
-          color: 0x475569,
-          opacity: 0.6,
-          transparent: true
-        });
         
+        const material = new THREE.LineBasicMaterial({ 
+          color: '#4b5563',
+          transparent: true,
+          opacity: 0.6
+        });
         const line = new THREE.Line(geometry, material);
         scene.add(line);
+
+        const glowMaterial = new THREE.LineBasicMaterial({
+          color: '#6b7280',
+          transparent: true,
+          opacity: 0.2,
+          linewidth: 2
+        });
+        const glowLine = new THREE.Line(geometry, glowMaterial);
+        scene.add(glowLine);
       }
     });
+
+    // Add frustum visualization if camera exists
+    if (camera) {
+      const frustumMesh = createFrustumVisualization(camera);
+      scene.add(frustumMesh);
+
+      const updateFrustum = () => {
+        const frustum = new THREE.Frustum();
+        const projScreenMatrix = new THREE.Matrix4();
+        projScreenMatrix.multiplyMatrices(
+          camera.projectionMatrix,
+          camera.matrixWorldInverse
+        );
+        frustum.setFromProjectionMatrix(projScreenMatrix);
+
+        frustumMesh.position.copy(camera.position);
+        frustumMesh.quaternion.copy(camera.quaternion);
+        
+        const distance = camera.position.length();
+        const scale = distance * 0.15;
+        frustumMesh.scale.set(scale, scale, scale);
+      };
+
+      if (controls) {
+        controls.addEventListener('change', updateFrustum);
+        return () => controls.removeEventListener('change', updateFrustum);
+      }
+    }
 
     // Animation loop
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
-      controls?.update();
-      renderer.render(scene, camera);
+      minimapControlsRef.current?.update();
+      renderer.render(scene, minimapCamera);
     };
     animate();
 
@@ -160,9 +245,9 @@ const Minimap: React.FC<MinimapProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [nodes, edges, nodePositions, activeNode, is3D]);
+  }, [nodes, edges, nodePositions, activeNode, camera, controls, is3D]);
 
-  // Calculate viewport bounds
+  // Calculate viewport bounds for 2D view
   const calculateViewportBounds = () => {
     if (!camera) return null;
     
@@ -194,77 +279,19 @@ const Minimap: React.FC<MinimapProps> = ({
     };
   };
 
-  // Calculate global bounds
-  const calculateGlobalBounds = (positions: [number, number, number][]) => {
-    return positions.reduce(
-      (acc, pos) => ({
-        minX: Math.min(acc.minX, pos[0]),
-        maxX: Math.max(acc.maxX, pos[0]),
-        minY: Math.min(acc.minY, pos[1]),
-        maxY: Math.max(acc.maxY, pos[1])
-      }),
-      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-    );
-  };
-
-  // Project 3D coordinates to 2D
-const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvasSize: { width: number, height: number }) => {
+  // Project 3D coordinates to 2D canvas
+  const projectToCanvas = (pos: [number, number, number], bounds: Bounds, canvasSize: { width: number; height: number }) => {
     const padding = 20;
     const width = canvasSize.width - 2 * padding;
     const height = canvasSize.height - 2 * padding;
     
     const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
-    // Invert the Y coordinate calculation
     const y = canvasSize.height - (padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height);
     
     return [x, y] as const;
-};
-
-  // Handle minimap click
-  const handleMinimapClick = (event: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
-    if (!camera || !controls) return;
-    
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    
-    const bounds = calculateGlobalBounds(Array.from(nodePositions.values()));
-    const padding = 20;
-    const width = event.currentTarget.clientWidth - 2 * padding;
-    const height = event.currentTarget.clientHeight - 2 * padding;
-    
-    const sceneX = ((x - padding) / width) * (bounds.maxX - bounds.minX) + bounds.minX;
-    // Invert the Y coordinate calculation for click handling
-    const sceneY = (1 - ((y - padding) / height)) * (bounds.maxY - bounds.minY) + bounds.minY;
-    
-    const targetPosition = new THREE.Vector3(sceneX, sceneY, camera.position.z);
-    const startPosition = camera.position.clone();
-    const duration = 500;
-    const startTime = Date.now();
-    
-    const animateCamera = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      const easeProgress = progress < 0.5
-        ? 2 * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-      
-      camera.position.lerpVectors(startPosition, targetPosition, easeProgress);
-      
-      if (progress < 1) {
-        requestAnimationFrame(animateCamera);
-      } else {
-        controls.target.set(sceneX, sceneY, 0);
-        controls.update();
-        onViewportChange?.(targetPosition, camera.zoom);
-      }
-    };
-    
-    animateCamera();
   };
 
-  // 2D rendering
+  // Render 2D view
   const render2D = useMemo(() => {
     return () => {
       if (!canvasRef.current || is3D) return;
@@ -272,15 +299,20 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      canvas.width = 192;
-      canvas.height = 144;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const positions = Array.from(nodePositions.values());
-      const bounds = calculateGlobalBounds(positions);
+      const bounds = positions.reduce(
+        (acc: Bounds, pos: [number, number, number]) => ({
+          minX: Math.min(acc.minX, pos[0]),
+          maxX: Math.max(acc.maxX, pos[0]),
+          minY: Math.min(acc.minY, pos[1]),
+          maxY: Math.max(acc.maxY, pos[1])
+        }),
+        { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+      );
 
       // Draw edges
-      ctx.lineWidth = 1;
       edges.forEach(edge => {
         const startPos = nodePositions.get(edge.source);
         const endPos = nodePositions.get(edge.target);
@@ -289,7 +321,10 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
           const [x1, y1] = projectToCanvas(startPos, bounds, { width: canvas.width, height: canvas.height });
           const [x2, y2] = projectToCanvas(endPos, bounds, { width: canvas.width, height: canvas.height });
           
+          ctx.shadowColor = 'rgba(71, 85, 105, 0.5)';
+          ctx.shadowBlur = 4;
           ctx.strokeStyle = '#475569';
+          
           ctx.beginPath();
           ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
@@ -304,24 +339,20 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
 
         const [x, y] = projectToCanvas(position, bounds, { width: canvas.width, height: canvas.height });
         
+        ctx.shadowColor = node.id === activeNode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 6;
+        
         ctx.beginPath();
         ctx.arc(x, y, node.id === activeNode ? 6 : 4, 0, Math.PI * 2);
         
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, node.id === activeNode ? 6 : 4);
-        if (node.id === 'start') {
-          gradient.addColorStop(0, '#fef3c7');
-          gradient.addColorStop(1, '#fbbf24');
-        } else if (node.className?.includes('pattern')) {
-          gradient.addColorStop(0, '#e0e7ff');
-          gradient.addColorStop(1, '#818cf8');
-        } else {
-          gradient.addColorStop(0, '#cffafe');
-          gradient.addColorStop(1, '#22d3ee');
-        }
+        const colors = getNodeColors(node);
+        gradient.addColorStop(0, colors[0]);
+        gradient.addColorStop(1, colors[1]);
         
         ctx.fillStyle = gradient;
         ctx.fill();
-
+        
         if (node.id === activeNode) {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2;
@@ -333,28 +364,28 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
       if (camera) {
         const viewportBounds = calculateViewportBounds();
         if (viewportBounds) {
-          const center = viewportBounds.center;
-          const [cx, cy] = projectToCanvas([center.x, center.y, center.z], bounds, { width: canvas.width, height: canvas.height });
-          
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
           ctx.lineWidth = 1.5;
           ctx.setLineDash([4, 4]);
-          
-          const vpWidth = viewportBounds.width * (canvas.width / (bounds.maxX - bounds.minX));
-          const vpHeight = viewportBounds.height * (canvas.height / (bounds.maxY - bounds.minY));
-          
+          ctx.lineDashOffset = (Date.now() / 50) % 8;
+
+          const [cx, cy] = projectToCanvas(
+            [viewportBounds.center.x, viewportBounds.center.y, viewportBounds.center.z],
+            bounds,
+            { width: canvas.width, height: canvas.height }
+          );
+
           ctx.beginPath();
           ctx.rect(
-            cx - vpWidth / 2,
-            cy - vpHeight / 2,
-            vpWidth,
-            vpHeight
+            cx - viewportBounds.width / 2,
+            cy - viewportBounds.height / 2,
+            viewportBounds.width,
+            viewportBounds.height
           );
           ctx.stroke();
-          
+
           ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
           ctx.fill();
-          
           ctx.setLineDash([]);
         }
       }
@@ -364,9 +395,32 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
   // Run 2D render
   useEffect(() => {
     if (!is3D) {
-      render2D();
+      const animate = () => {
+        render2D();
+        animationFrameRef.current = requestAnimationFrame(animate);
+      };
+      animate();
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      };
     }
   }, [render2D, is3D]);
+
+  // Utility functions
+  const getNodeColor = (node: Node, activeNode: string | null): string => {
+    if (node.id === activeNode) return '#fbbf24';
+    if (node.id === 'start') return '#fbbf24';
+    if (node.className?.includes('pattern')) return '#818cf8';
+    return '#22d3ee';
+  };
+
+  const getNodeColors = (node: Node): [string, string] => {
+    if (node.id === 'start') return ['#fef3c7', '#fbbf24'];
+    if (node.className?.includes('pattern')) return ['#e0e7ff', '#818cf8'];
+    return ['#cffafe', '#22d3ee'];
+  };
 
   return (
     <motion.div
@@ -375,7 +429,7 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
       transition={{ duration: 0.3, type: "spring", stiffness: 260, damping: 20 }}
       className="fixed bottom-4 right-4 z-50"
     >
-      <Card className="w-48 h-36 overflow-hidden shadow-xl">
+      <div className="w-48 h-36 overflow-hidden shadow-xl rounded-lg">
         <div className="relative w-full h-full bg-gray-900/90 backdrop-blur-md">
           {is3D ? (
             <div 
@@ -385,17 +439,15 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
               onMouseDown={() => setIsDragging(true)}
               onMouseUp={() => setIsDragging(false)}
               onMouseLeave={() => setIsDragging(false)}
-              onClick={handleMinimapClick}
             />
           ) : (
-                <canvas
+            <canvas
               ref={canvasRef}
               className="w-full h-full"
               style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
               onMouseDown={() => setIsDragging(true)}
               onMouseUp={() => setIsDragging(false)}
               onMouseLeave={() => setIsDragging(false)}
-              onClick={handleMinimapClick}
             />
           )}
           <button
@@ -405,7 +457,7 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
             {is3D ? '2D' : '3D'}
           </button>
         </div>
-      </Card>
+      </div>
     </motion.div>
   );
 };
