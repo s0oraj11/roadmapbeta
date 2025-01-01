@@ -14,7 +14,7 @@ import {
   calculateNewCameraPosition
 } from './utils'
 import ControlButtons from './ControlButtons'
-import Minimap from './Minimap'
+import Minimap from './minimap/index'
 
 interface StellarRoadmapProps {
   nodes: FlowNode[]
