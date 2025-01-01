@@ -75,13 +75,6 @@ const Minimap: React.FC<MinimapProps> = ({
     controls.zoomSpeed = 0.5;
     minimapControlsRef.current = controls;
 
-    // Add lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set(10, 10, 10);
-    scene.add(directionalLight);
 
     return () => {
       if (animationFrameRef.current) {
@@ -141,16 +134,16 @@ const Minimap: React.FC<MinimapProps> = ({
   };
 
   // Project 3D coordinates to 2D
-  const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvasSize: { width: number, height: number }) => {
-    const padding = 20;
-    const width = canvasSize.width - 2 * padding;
-    const height = canvasSize.height - 2 * padding;
-    
-    const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
-    const y = padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height;
-    
-    return [x, y] as const;
-  };
+const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvasSize: { width: number, height: number }) => {
+  const padding = 20;
+  const width = canvasSize.width - 2 * padding;
+  const height = canvasSize.height - 2 * padding;
+  
+  const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
+  const y = canvasSize.height - (padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height);
+  
+  return [x, y] as const;
+};
 
   // Update 3D scene
   useEffect(() => {
@@ -170,7 +163,7 @@ const Minimap: React.FC<MinimapProps> = ({
       const position = nodePositions.get(node.id);
       if (!position) return;
 
-      const geometry = new THREE.SphereGeometry(0.3, 32, 32);
+      const geometry = new THREE.SphereGeometry(0.3, 16, 16);
       const material = new THREE.MeshPhongMaterial({ 
         color: node.id === activeNode ? 0xffffff : 
                node.id === 'start' ? 0xfbbf24 :
@@ -347,20 +340,26 @@ const Minimap: React.FC<MinimapProps> = ({
   }, [nodes, edges, nodePositions, activeNode, camera, is3D]);
 
   // Run 2D render with animation frame
-  useEffect(() => {
-    if (!is3D) {
-      const animate = () => {
-        render2D();
-        animationFrameRef.current = requestAnimationFrame(animate);
-      };
-      animate();
-      return () => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-      };
+useEffect(() => {
+  let animationFrame: number;
+
+  const animate = () => {
+    if (is3D) {
+      if (minimapControlsRef.current) {
+        minimapControlsRef.current.update();
+      }
+      if (rendererRef.current && sceneRef.current && minimapCameraRef.current) {
+        rendererRef.current.render(sceneRef.current, minimapCameraRef.current);
+      }
+    } else {
+      render2D();
     }
-  }, [render2D, is3D]);
+    animationFrame = requestAnimationFrame(animate);
+  };
+
+  animate();
+  return () => cancelAnimationFrame(animationFrame);
+}, [is3D, render2D]);
 
   // Handle minimap click
   const handleMinimapClick = (event: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
@@ -376,7 +375,7 @@ const Minimap: React.FC<MinimapProps> = ({
     const height = event.currentTarget.clientHeight - 2 * padding;
     
     const sceneX = ((x - padding) / width) * (bounds.maxX - bounds.minX) + bounds.minX;
-    const sceneY = ((y - padding) / height) * (bounds.maxY - bounds.minY) + bounds.minY;
+    const sceneY = (1 - ((y - padding) / height)) * (bounds.maxY - bounds.minY) + bounds.minY;
     
     const targetPosition = new THREE.Vector3(sceneX, sceneY, camera.position.z);
     const startPosition = camera.position.clone();
