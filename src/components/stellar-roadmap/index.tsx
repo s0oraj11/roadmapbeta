@@ -22,12 +22,21 @@ interface StellarRoadmapProps {
 }
 
 const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Camera) => void }) => {
-  const { camera } = useThree()
+  const { camera, scene } = useThree()
   
   useEffect(() => {
     camera.position.set(...CAMERA_SETTINGS.INITIAL_POSITION)
+    camera.lookAt(0, 0, 0)
+    
+    // Optional: calculate ideal camera position based on graph size
+    const box = new THREE.Box3().setFromObject(scene)
+    const size = box.getSize(new THREE.Vector3())
+    const distance = Math.max(size.x, size.y) / Math.tan((camera.fov * Math.PI) / 360)
+    camera.position.z = Math.max(distance * 0.7, CAMERA_SETTINGS.INITIAL_POSITION[2])
+    
+    camera.updateProjectionMatrix()
     onCameraReady(camera)
-  }, [camera, onCameraReady])
+  }, [camera, scene, onCameraReady])
   
   return null
 }
@@ -137,17 +146,18 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
     }
   }, [camera])
 
-  const handleReset = useCallback(() => {
-    if (controlsRef.current && initialCameraPosition.current && camera) {
-      camera.position.copy(initialCameraPosition.current)
-      controlsRef.current.target.set(0, 0, 0)
-      camera.updateProjectionMatrix()
-      controlsRef.current.update()
-      setActiveNode(null)
-      setSelectedNode(null)
-      setNodePositions(calculateNodePositions(nodes))
-    }
-  }, [camera, nodes])
+const handleReset = useCallback(() => {
+  if (controlsRef.current && initialCameraPosition.current && camera) {
+    camera.position.set(...CAMERA_SETTINGS.INITIAL_POSITION)
+    controlsRef.current.target.set(0, 0, 0)
+    camera.lookAt(0, 0, 0)
+    camera.updateProjectionMatrix()
+    controlsRef.current.update()
+    setActiveNode(null)
+    setSelectedNode(null)
+    setNodePositions(calculateNodePositions(nodes))
+  }
+}, [camera, nodes])
 
   const handleCameraReady = useCallback((camera: THREE.Camera) => {
     setCamera(camera)
