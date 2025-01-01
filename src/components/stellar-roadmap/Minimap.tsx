@@ -45,49 +45,42 @@ const Minimap: React.FC<MinimapProps> = ({
   const [is3D, setIs3D] = useState(mode === '3d');
   const [isDragging, setIsDragging] = useState(false);
 
-  // Initialize 3D scene with improved setup
+  // Initialize 3D scene
   useEffect(() => {
     if (!containerRef.current || !is3D) return;
 
-    // Enhanced scene setup
+    // Setup scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#0f172a');
     sceneRef.current = scene;
 
-    // Improved renderer with better quality
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true,
-      alpha: true,
-      precision: 'highp'
-    });
+    // Setup renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(192, 144);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.physicallyCorrectLights = true;
+    renderer.setClearColor(0x000000, 0);
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Enhanced camera setup as per original version
-    const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
-    minimapCamera.position.set(5, 5, 5);
-    minimapCamera.lookAt(0, 0, 0);
-    minimapCameraRef.current = minimapCamera;
+    // Setup camera
+    const camera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
+    camera.position.set(0, 15, 15);
+    camera.lookAt(0, 0, 0);
+    minimapCameraRef.current = camera;
 
-    // Improved controls configuration
-    const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
-    minimapControls.enableDamping = true;
-    minimapControls.dampingFactor = 0.05;
-    minimapControls.rotateSpeed = 0.5;
-    minimapControls.zoomSpeed = 0.5;
-    minimapControls.enablePan = false;
-    minimapControlsRef.current = minimapControls;
+    // Setup controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.rotateSpeed = 0.5;
+    controls.zoomSpeed = 0.5;
+    minimapControlsRef.current = controls;
 
-    // Enhanced lighting setup
+    // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight.position.set(10, 10, 10);
-    directionalLight.castShadow = true;
     scene.add(directionalLight);
 
     return () => {
@@ -95,138 +88,159 @@ const Minimap: React.FC<MinimapProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
       renderer.dispose();
-      minimapControls.dispose();
-      containerRef.current?.removeChild(renderer.domElement);
+      controls.dispose();
+      if (containerRef.current?.contains(renderer.domElement)) {
+        containerRef.current.removeChild(renderer.domElement);
+      }
     };
   }, [is3D]);
 
-  // Create frustum visualization
-  const createFrustumVisualization = (camera: THREE.Camera) => {
-    const frustumGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.LineBasicMaterial({
-      color: '#ffffff',
-      opacity: 0.4,
-      transparent: true,
-    });
+  // Calculate viewport bounds
+  const calculateViewportBounds = () => {
+    if (!camera) return null;
     
-    const wireframeMaterial = new THREE.LineBasicMaterial({
-      color: '#ffffff',
-      opacity: 0.2,
-      transparent: true,
-    });
-
-    const frustumMesh = new THREE.Mesh(frustumGeometry, material);
-    const wireframe = new THREE.LineSegments(
-      new THREE.WireframeGeometry(frustumGeometry),
-      wireframeMaterial
+    const frustum = new THREE.Frustum();
+    const matrix = new THREE.Matrix4().multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
     );
+    frustum.setFromProjectionMatrix(matrix);
+
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);
+    const distance = 15;
     
-    frustumMesh.add(wireframe);
-    return frustumMesh;
+    const aspectRatio = 192/144;
+    const vFOV = THREE.MathUtils.degToRad(camera.fov);
+    const height = 2 * Math.tan(vFOV / 2) * distance;
+    const width = height * aspectRatio;
+
+    const cameraRight = new THREE.Vector3().crossVectors(cameraDirection, camera.up).normalize();
+    const cameraUp = new THREE.Vector3().crossVectors(cameraRight, cameraDirection).normalize();
+
+    return {
+      center: camera.position.clone().add(cameraDirection.multiplyScalar(distance)),
+      width,
+      height,
+      right: cameraRight,
+      up: cameraUp
+    };
   };
 
-  // Update 3D scene with enhanced visuals
+  // Calculate global bounds
+  const calculateGlobalBounds = (positions: [number, number, number][]) => {
+    return positions.reduce(
+      (acc, pos) => ({
+        minX: Math.min(acc.minX, pos[0]),
+        maxX: Math.max(acc.maxX, pos[0]),
+        minY: Math.min(acc.minY, pos[1]),
+        maxY: Math.max(acc.maxY, pos[1])
+      }),
+      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+    );
+  };
+
+  // Project 3D coordinates to 2D
+  const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvasSize: { width: number, height: number }) => {
+    const padding = 20;
+    const width = canvasSize.width - 2 * padding;
+    const height = canvasSize.height - 2 * padding;
+    
+    const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
+    const y = padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height;
+    
+    return [x, y] as const;
+  };
+
+  // Update 3D scene
   useEffect(() => {
-    if (!is3D || !sceneRef.current) return;
+    if (!is3D || !sceneRef.current || !rendererRef.current || !minimapCameraRef.current) return;
 
     const scene = sceneRef.current;
+    const renderer = rendererRef.current;
+    const camera = minimapCameraRef.current;
+
+    // Clear existing nodes and edges
     while(scene.children.length > 0) {
       scene.remove(scene.children[0]);
     }
 
-    // Add enhanced nodes
+    // Add nodes
     nodes.forEach(node => {
       const position = nodePositions.get(node.id);
       if (!position) return;
 
       const geometry = new THREE.SphereGeometry(0.3, 32, 32);
       const material = new THREE.MeshPhongMaterial({ 
-        color: getNodeColor(node, activeNode),
-        emissive: getNodeColor(node, activeNode),
-        emissiveIntensity: 0.2,
-        shininess: 100
+        color: node.id === activeNode ? 0xffffff : 
+               node.id === 'start' ? 0xfbbf24 :
+               node.className?.includes('pattern') ? 0x818cf8 : 
+               0x22d3ee
       });
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(...position);
-      
+      scene.add(sphere);
+
       if (node.id === activeNode) {
         const glowGeometry = new THREE.SphereGeometry(0.4, 32, 32);
         const glowMaterial = new THREE.MeshBasicMaterial({
-          color: '#ffffff',
+          color: 0xffffff,
           transparent: true,
           opacity: 0.3
         });
         const glow = new THREE.Mesh(glowGeometry, glowMaterial);
         sphere.add(glow);
       }
-      
-      scene.add(sphere);
     });
 
-    // Add enhanced edges with glow
+    // Add edges with glow effect
     edges.forEach(edge => {
       const startPos = nodePositions.get(edge.source);
       const endPos = nodePositions.get(edge.target);
       
-      if (!startPos || !endPos) return;
+      if (startPos && endPos) {
+        const points = [
+          new THREE.Vector3(...startPos),
+          new THREE.Vector3(...endPos)
+        ];
+        
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({ 
+          color: 0x475569,
+          opacity: 0.6,
+          transparent: true
+        });
+        
+        const line = new THREE.Line(geometry, material);
+        scene.add(line);
 
-      const points = [
-        new THREE.Vector3(...startPos),
-        new THREE.Vector3(...endPos)
-      ];
-      
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      
-      // Main edge line
-      const material = new THREE.LineBasicMaterial({ 
-        color: '#4b5563',
-        transparent: true,
-        opacity: 0.6
-      });
-      const line = new THREE.Line(geometry, material);
-      scene.add(line);
-
-      // Glow effect
-      const glowMaterial = new THREE.LineBasicMaterial({
-        color: '#6b7280',
-        transparent: true,
-        opacity: 0.2,
-        linewidth: 2
-      });
-      const glowLine = new THREE.Line(geometry, glowMaterial);
-      scene.add(glowLine);
+        const glowMaterial = new THREE.LineBasicMaterial({
+          color: 0x6b7280,
+          transparent: true,
+          opacity: 0.2,
+          linewidth: 2
+        });
+        const glowLine = new THREE.Line(geometry, glowMaterial);
+        scene.add(glowLine);
+      }
     });
 
-    // Add improved camera frustum visualization
-    if (camera) {
-      const frustumMesh = createFrustumVisualization(camera);
-      scene.add(frustumMesh);
+    // Animation loop
+    const animate = () => {
+      animationFrameRef.current = requestAnimationFrame(animate);
+      minimapControlsRef.current?.update();
+      renderer.render(scene, camera);
+    };
+    animate();
 
-      const updateFrustum = () => {
-        const frustum = new THREE.Frustum();
-        const projScreenMatrix = new THREE.Matrix4();
-        projScreenMatrix.multiplyMatrices(
-          camera.projectionMatrix,
-          camera.matrixWorldInverse
-        );
-        frustum.setFromProjectionMatrix(projScreenMatrix);
-
-        frustumMesh.position.copy(camera.position);
-        frustumMesh.quaternion.copy(camera.quaternion);
-        
-        const distance = camera.position.length();
-        const scale = distance * 0.15;
-        frustumMesh.scale.set(scale, scale, scale);
-      };
-
-      if (controls) {
-        controls.addEventListener('change', updateFrustum);
-        return () => controls.removeEventListener('change', updateFrustum);
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
-    }
-  }, [nodes, edges, nodePositions, activeNode, camera, controls, is3D]);
+    };
+  }, [nodes, edges, nodePositions, activeNode, is3D]);
 
-  // Enhanced 2D rendering
+  // Render 2D view
   const render2D = useMemo(() => {
     return () => {
       if (!canvasRef.current || is3D) return;
@@ -241,15 +255,15 @@ const Minimap: React.FC<MinimapProps> = ({
       const positions = Array.from(nodePositions.values());
       const bounds = calculateGlobalBounds(positions);
 
-      // Draw enhanced edges
+      // Draw edges
       ctx.lineWidth = 1;
       edges.forEach(edge => {
         const startPos = nodePositions.get(edge.source);
         const endPos = nodePositions.get(edge.target);
         
         if (startPos && endPos) {
-          const [x1, y1] = projectToCanvas(startPos, bounds, canvas);
-          const [x2, y2] = projectToCanvas(endPos, bounds, canvas);
+          const [x1, y1] = projectToCanvas(startPos, bounds, { width: canvas.width, height: canvas.height });
+          const [x2, y2] = projectToCanvas(endPos, bounds, { width: canvas.width, height: canvas.height });
           
           ctx.shadowColor = 'rgba(71, 85, 105, 0.5)';
           ctx.shadowBlur = 4;
@@ -262,12 +276,12 @@ const Minimap: React.FC<MinimapProps> = ({
         }
       });
 
-      // Draw enhanced nodes
+      // Draw nodes
       nodes.forEach(node => {
         const position = nodePositions.get(node.id);
         if (!position) return;
 
-        const [x, y] = projectToCanvas(position, bounds, canvas);
+        const [x, y] = projectToCanvas(position, bounds, { width: canvas.width, height: canvas.height });
         
         ctx.shadowColor = node.id === activeNode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)';
         ctx.shadowBlur = 6;
@@ -276,13 +290,20 @@ const Minimap: React.FC<MinimapProps> = ({
         ctx.arc(x, y, node.id === activeNode ? 6 : 4, 0, Math.PI * 2);
         
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, node.id === activeNode ? 6 : 4);
-        const colors = getNodeColors(node);
-        gradient.addColorStop(0, colors[0]);
-        gradient.addColorStop(1, colors[1]);
+        if (node.id === 'start') {
+          gradient.addColorStop(0, '#fef3c7');
+          gradient.addColorStop(1, '#fbbf24');
+        } else if (node.className?.includes('pattern')) {
+          gradient.addColorStop(0, '#e0e7ff');
+          gradient.addColorStop(1, '#818cf8');
+        } else {
+          gradient.addColorStop(0, '#cffafe');
+          gradient.addColorStop(1, '#22d3ee');
+        }
         
         ctx.fillStyle = gradient;
         ctx.fill();
-        
+
         if (node.id === activeNode) {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2;
@@ -290,118 +311,58 @@ const Minimap: React.FC<MinimapProps> = ({
         }
       });
 
-      // Draw enhanced viewport
+      // Draw viewport with animated dotted lines
       if (camera) {
-        const viewportPoints = getViewportPoints(camera).map(point => 
-          projectToCanvas([point.x, point.y, point.z], bounds, canvas)
-        );
-
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.lineDashOffset = (Date.now() / 50) % 8;
-
-        ctx.beginPath();
-        ctx.moveTo(viewportPoints[0][0], viewportPoints[0][1]);
-        viewportPoints.forEach(([x, y]) => {
-          ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-        ctx.stroke();
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.fill();
+        const viewportBounds = calculateViewportBounds();
+        if (viewportBounds) {
+          const center = viewportBounds.center;
+          const [cx, cy] = projectToCanvas([center.x, center.y, center.z], bounds, { width: canvas.width, height: canvas.height });
+          
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.lineDashOffset = (Date.now() / 50) % 8;
+          
+          const vpWidth = viewportBounds.width * (canvas.width / (bounds.maxX - bounds.minX));
+          const vpHeight = viewportBounds.height * (canvas.height / (bounds.maxY - bounds.minY));
+          
+          ctx.beginPath();
+          ctx.rect(
+            cx - vpWidth / 2,
+            cy - vpHeight / 2,
+            vpWidth,
+            vpHeight
+          );
+          ctx.stroke();
+          
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+          ctx.fill();
+          
+          ctx.setLineDash([]);
+        }
       }
+
+      requestAnimationFrame(render2D);
     };
   }, [nodes, edges, nodePositions, activeNode, camera, is3D]);
 
-  // Animation loop
+  // Run 2D render with animation frame
   useEffect(() => {
-    let animationFrame: number;
-
-    const animate = () => {
-      if (is3D) {
-        if (minimapControlsRef.current) {
-          minimapControlsRef.current.update();
-        }
-        if (rendererRef.current && sceneRef.current && minimapCameraRef.current) {
-          rendererRef.current.render(sceneRef.current, minimapCameraRef.current);
-        }
-      } else {
+    if (!is3D) {
+      const animate = () => {
         render2D();
-      }
-      animationFrame = requestAnimationFrame(animate);
-    };
+        animationFrameRef.current = requestAnimationFrame(animate);
+      };
+      animate();
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      };
+    }
+  }, [render2D, is3D]);
 
-    animate();
-    return () => cancelAnimationFrame(animationFrame);
-  }, [is3D, render2D]);
-
-  // Utility functions
-  const getNodeColor = (node: Node, activeNode: string | null): string => {
-    if (node.id === activeNode) return '#fbbf24';
-    if (node.id === 'start') return '#fbbf24';
-    if (node.className?.includes('pattern')) return '#818cf8';
-    return '#22d3ee';
-  };
-
-  const getNodeColors = (node: Node): [string, string] => {
-    if (node.id === 'start') return ['#fef3c7', '#fbbf24'];
-    if (node.className?.includes('pattern')) return ['#e0e7ff', '#818cf8'];
-    return ['#cffafe', '#22d3ee'];
-  };
-
-  const calculateGlobalBounds = (positions: [number, number, number][]) => {
-    return positions.reduce(
-      (acc, pos) => ({
-        minX: Math.min(acc.minX, pos[0]),
-        maxX: Math.max(acc.maxX, pos[0]),
-        minY: Math.min(acc.minY, pos[1]),
-        maxY: Math.max(acc.maxY, pos[1])
-      }),
-      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-    );
-  };
-
-  const getViewportPoints = (camera: THREE.Camera): THREE.Vector3[] => {
-    const frustum = new THREE.Frustum();
-    const projScreenMatrix = new THREE.Matrix4();
-    projScreenMatrix.multiplyMatrices(
-      camera.projectionMatrix,
-      camera.matrixWorldInverse
-    );
-    frustum.setFromProjectionMatrix(projScreenMatrix);
-
-    const near = camera.near;
-    const far = camera.far;
-    const aspect = camera.aspect;
-    const fov = (camera.fov * Math.PI) / 180;
-    const height = Math.tan(fov / 2);
-    const width = height * aspect;
-
-    const points = [
-      new THREE.Vector3(-width * near, -height * near, -near),
-      new THREE.Vector3(width * near, -height * near, -near),
-      new THREE.Vector3(width * near, height * near, -near),
-      new THREE.Vector3(-width * near, height * near, -near),
-    ];
-
-    return points.map(point => point.applyMatrix4(camera.matrixWorld));
-  };
-
-  const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvas: HTMLCanvasElement) => {
-    const padding = 20;
-    const width = canvas.width - 2 * padding;
-    const height = canvas.height - 2 * padding;
-    
-    const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
-    // Invert Y coordinate for proper canvas rendering
-      const y = padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height;
-    
-    return [x, y];
-  };
-
-  // Enhanced click handling
+  // Handle minimap click
   const handleMinimapClick = (event: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
     if (!camera || !controls) return;
     
@@ -415,7 +376,7 @@ const Minimap: React.FC<MinimapProps> = ({
     const height = event.currentTarget.clientHeight - 2 * padding;
     
     const sceneX = ((x - padding) / width) * (bounds.maxX - bounds.minX) + bounds.minX;
-    const sceneY = (1 - ((y - padding) / height)) * (bounds.maxY - bounds.minY) + bounds.minY;
+    const sceneY = ((y - padding) / height) * (bounds.maxY - bounds.minY) + bounds.minY;
     
     const targetPosition = new THREE.Vector3(sceneX, sceneY, camera.position.z);
     const startPosition = camera.position.clone();
