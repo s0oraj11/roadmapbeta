@@ -49,6 +49,8 @@ const Minimap: React.FC<MinimapProps> = ({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#0f172a');
     sceneRef.current = scene;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const renderer = new THREE.WebGLRenderer({ 
       antialias: true,
@@ -106,9 +108,15 @@ const Minimap: React.FC<MinimapProps> = ({
       if (!position) return;
 
       const geometry = new THREE.SphereGeometry(0.3, 16, 16);
-      const material = new THREE.MeshBasicMaterial({ 
-        color: getNodeColor(node, activeNode)
+      const material = new THREE.MeshStandardMaterial({ 
+        color: getNodeColor(node, activeNode),
+        metalness: 0.2,
+        roughness: 0.8,
+        emissive: getNodeColor(node, activeNode),
+        emissiveIntensity: 0.2
       });
+
+
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(...position);
       
@@ -190,6 +198,49 @@ const Minimap: React.FC<MinimapProps> = ({
         controls.addEventListener('change', updateFrustum);
         return () => controls.removeEventListener('change', updateFrustum);
       }
+
+      // Add spotlight for torch effect
+if (camera && is3D) {
+  // Add a spotlight
+  const spotlight = new THREE.SpotLight('#ffffff', 2);
+  spotlight.angle = Math.PI / 6; // 30 degrees
+  spotlight.penumbra = 0.3;
+  spotlight.decay = 1.5;
+  spotlight.distance = 30;
+  
+  // Position the spotlight slightly above and behind the camera
+  const spotlightOffset = new THREE.Vector3(0, 2, 2);
+  spotlight.position.copy(camera.position).add(spotlightOffset);
+  
+  // Point the spotlight at the center of the scene
+  const targetObject = new THREE.Object3D();
+  sceneRef.current.add(targetObject);
+  spotlight.target = targetObject;
+  
+  // Add subtle ambient light to prevent complete darkness
+  const ambientLight = new THREE.AmbientLight('#ffffff', 0.2);
+  
+  sceneRef.current.add(spotlight);
+  sceneRef.current.add(ambientLight);
+  
+  // Update spotlight position when camera moves
+  if (controls) {
+    const updateSpotlight = () => {
+      spotlight.position.copy(camera.position).add(spotlightOffset);
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      targetObject.position.copy(camera.position).add(direction.multiplyScalar(10));
+    };
+    
+    controls.addEventListener('change', updateSpotlight);
+    return () => controls.removeEventListener('change', updateSpotlight);
+  }
+}
+
+
+
+
+      
     }
   }, [nodes, edges, nodePositions, activeNode, camera, controls, is3D]);
 
