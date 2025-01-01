@@ -418,7 +418,7 @@ if (camera) {
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
       animate={{ opacity: 0.95, scale: 1, y: 0 }}
       transition={{ duration: 0.3, type: "spring", stiffness: 260, damping: 20 }}
-      className="fixed bottom-4 right-4 z-50"
+      className="absolute bottom-4 left-16 z-50"
     >
       <Card className="w-48 h-36 overflow-hidden shadow-xl">
         <div className="relative w-full h-full bg-gray-900/90 backdrop-blur-md">
@@ -445,7 +445,7 @@ if (camera) {
             onClick={() => setIs3D(!is3D)}
             className="absolute top-2 right-2 p-1 rounded-md bg-gray-800/80 hover:bg-gray-700/80 transition-colors text-white text-sm"
           >
-            {is3D ? '2D' : '3D'}
+            {is3D ? 'Switch to 2D' : 'Switch to 3D'}
           </button>
         </div>
       </Card>
