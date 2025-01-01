@@ -8,18 +8,11 @@ interface MinimapProps {
   edges: Edge[];
   nodePositions: Map<string, [number, number, number]>;
   activeNode: string | null;
-  camera?: THREE.Camera;
-  controls?: any;
+  camera?: THREE.Camera;  // Add camera prop
+  controls?: any;         // Add controls prop
 }
 
-const Minimap: React.FC<MinimapProps> = ({ 
-  nodes, 
-  edges, 
-  nodePositions, 
-  activeNode,
-  camera,
-  controls 
-}) => {
+const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNode, camera, controls }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -48,69 +41,45 @@ const Minimap: React.FC<MinimapProps> = ({
 
   // Calculate viewport rectangle
   const calculateViewportRect = (
-    ctx: CanvasRenderingContext2D, 
-    width: number, 
-    height: number
-  ) => {
+    camera: THREE.Camera,
+    controls: any,
+    canvasWidth: number,
+    canvasHeight: number
+  ): { x: number; y: number; width: number; height: number } | null => {
     if (!camera || !controls) return null;
 
+    // Create frustum corners in world space
     const frustum = new THREE.Frustum();
     const projScreenMatrix = new THREE.Matrix4();
-    camera.updateMatrixWorld();
     projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(projScreenMatrix);
 
-    // Get the corners of the visible area
-    const corners: THREE.Vector3[] = [];
-    const near = camera.near;
-    const far = camera.far;
-    const aspect = camera.aspect;
-    const fov = camera.fov * (Math.PI / 180);
-    
-    const nearHeight = 2 * Math.tan(fov / 2) * near;
-    const nearWidth = nearHeight * aspect;
-    const farHeight = 2 * Math.tan(fov / 2) * far;
-    const farWidth = farHeight * aspect;
+    // Get the eight corners of the frustum
+    const corners = [
+      new THREE.Vector3(-1, -1, -1),
+      new THREE.Vector3(1, -1, -1),
+      new THREE.Vector3(-1, 1, -1),
+      new THREE.Vector3(1, 1, -1),
+    ].map(corner => {
+      corner.unproject(camera);
+      const [x, y] = projectToMinimap([corner.x, corner.y, corner.z], canvasWidth, canvasHeight);
+      return { x, y };
+    });
 
-    // Calculate corners in world space
-    const cameraDirection = new THREE.Vector3();
-    camera.getWorldDirection(cameraDirection);
-    const cameraPosition = camera.position.clone();
-    const cameraUp = camera.up.clone();
-    const cameraRight = new THREE.Vector3().crossVectors(cameraDirection, cameraUp);
+    // Calculate bounding box
+    const xs = corners.map(c => c.x);
+    const ys = corners.map(c => c.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
 
-    // Project corners to minimap space
-    const points = [
-      projectToMinimap([
-        cameraPosition.x + cameraRight.x * nearWidth/2,
-        cameraPosition.y + cameraUp.y * nearHeight/2,
-        cameraPosition.z
-      ], width, height),
-      projectToMinimap([
-        cameraPosition.x - cameraRight.x * nearWidth/2,
-        cameraPosition.y + cameraUp.y * nearHeight/2,
-        cameraPosition.z
-      ], width, height),
-      projectToMinimap([
-        cameraPosition.x - cameraRight.x * nearWidth/2,
-        cameraPosition.y - cameraUp.y * nearHeight/2,
-        cameraPosition.z
-      ], width, height),
-      projectToMinimap([
-        cameraPosition.x + cameraRight.x * nearWidth/2,
-        cameraPosition.y - cameraUp.y * nearHeight/2,
-        cameraPosition.z
-      ], width, height)
-    ];
-
-    // Draw viewport rectangle
-    ctx.beginPath();
-    ctx.moveTo(points[0][0], points[0][1]);
-    points.forEach(point => ctx.lineTo(point[0], point[1]));
-    ctx.closePath();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
   };
 
   useEffect(() => {
@@ -176,8 +145,17 @@ const Minimap: React.FC<MinimapProps> = ({
       }
     });
 
-    // Draw viewport rectangle
-    calculateViewportRect(ctx, canvas.width / scale, canvas.height / scale);
+    // Draw viewport rectangle if camera and controls are available
+    if (camera && controls) {
+      const viewport = calculateViewportRect(camera, controls, canvas.width / scale, canvas.height / scale);
+      if (viewport) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(viewport.x, viewport.y, viewport.width, viewport.height);
+        ctx.setLineDash([]);
+      }
+    }
 
   }, [nodes, edges, nodePositions, activeNode, camera, controls]);
 
