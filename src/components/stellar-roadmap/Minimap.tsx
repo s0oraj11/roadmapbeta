@@ -56,6 +56,7 @@ const Minimap: React.FC<MinimapProps> = ({
       antialias: true,
       alpha: true
     });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(192, 144);
     containerRef.current.appendChild(renderer.domElement);
