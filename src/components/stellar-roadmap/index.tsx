@@ -28,11 +28,12 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
     camera.position.set(...CAMERA_SETTINGS.INITIAL_POSITION)
     camera.lookAt(0, 0, 0)
     
-    // Optional: calculate ideal camera position based on graph size
+    // Calculate scene size and adjust distance
     const box = new THREE.Box3().setFromObject(scene)
     const size = box.getSize(new THREE.Vector3())
     const distance = Math.max(size.x, size.y) / Math.tan((camera.fov * Math.PI) / 360)
-    camera.position.z = Math.max(distance * 0.7, CAMERA_SETTINGS.INITIAL_POSITION[2])
+    // Reduce the calculated distance by multiplying with a factor less than 1
+    camera.position.z = Math.max(distance * 0.3, CAMERA_SETTINGS.INITIAL_POSITION[2])
     
     camera.updateProjectionMatrix()
     onCameraReady(camera)
