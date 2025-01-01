@@ -9,9 +9,10 @@ interface MinimapProps {
   nodePositions: Map<string, [number, number, number]>;
   activeNode: string | null;
   camera?: THREE.Camera;
+  controls?: any;
 }
 
-const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNode, camera }) => {
+const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNode, camera, controls }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -38,37 +39,35 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNo
     ];
   };
 
-  // Calculate viewport corners in world space
-  const calculateViewportCorners = (camera: THREE.Camera, width: number, height: number) => {
-    if (!camera) return null;
+  // Calculate viewport area based on camera and controls
+  const calculateViewportArea = () => {
+    if (!camera || !controls) return null;
 
-    const frustum = new THREE.Frustum();
-    const projScreenMatrix = new THREE.Matrix4();
-    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-    frustum.setFromProjectionMatrix(projScreenMatrix);
-
-    // Get the camera's view direction and right vector
-    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    // Get camera position and target
+    const cameraPos = camera.position;
+    const target = controls.target;
+    
+    // Calculate view size based on distance from target
+    const distance = cameraPos.distanceTo(target);
+    const vFov = camera.fov * Math.PI / 180;
+    const viewHeight = 2 * Math.tan(vFov / 2) * distance;
+    const viewWidth = viewHeight * camera.aspect;
+    
+    // Calculate viewport corners
+    const direction = new THREE.Vector3().subVectors(target, cameraPos).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-
-    // Calculate the camera's field of view
-    const fovY = camera.fov * Math.PI / 180;
-    const fovX = 2 * Math.atan(Math.tan(fovY / 2) * camera.aspect);
-
-    // Calculate the distances to the viewport corners
-    const distance = camera.position.length();
-    const heightAtDistance = 2 * distance * Math.tan(fovY / 2);
-    const widthAtDistance = heightAtDistance * camera.aspect;
-
-    // Calculate the corners
-    const center = camera.position.clone().add(direction.multiplyScalar(distance));
+    
+    const center = target;
+    
+    // Calculate corners relative to target point
     const topLeft = center.clone()
-      .add(up.multiplyScalar(heightAtDistance / 2))
-      .sub(right.multiplyScalar(widthAtDistance / 2));
+      .add(up.multiplyScalar(viewHeight / 2))
+      .sub(right.multiplyScalar(viewWidth / 2));
+      
     const bottomRight = center.clone()
-      .sub(up.multiplyScalar(heightAtDistance / 2))
-      .add(right.multiplyScalar(widthAtDistance / 2));
+      .sub(up.clone().multiplyScalar(viewHeight / 2))
+      .add(right.clone().multiplyScalar(viewWidth / 2));
 
     return {
       topLeft: [topLeft.x, topLeft.y, topLeft.z],
@@ -139,16 +138,16 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNo
       }
     });
 
-    // Draw viewport rectangle if camera is available
-    if (camera) {
-      const viewport = calculateViewportCorners(camera, canvas.width / scale, canvas.height / scale);
+    // Draw viewport rectangle
+    if (camera && controls) {
+      const viewport = calculateViewportArea();
       if (viewport) {
         const [topLeftX, topLeftY] = projectToMinimap(viewport.topLeft as [number, number, number], canvas.width / scale, canvas.height / scale);
         const [bottomRightX, bottomRightY] = projectToMinimap(viewport.bottomRight as [number, number, number], canvas.width / scale, canvas.height / scale);
 
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.lineWidth = 1;
-        ctx.setLineDash([2, 2]);
+        ctx.setLineDash([4, 4]);
         ctx.strokeRect(
           topLeftX,
           topLeftY,
@@ -159,7 +158,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNo
       }
     }
 
-  }, [nodes, edges, nodePositions, activeNode, camera]);
+  }, [nodes, edges, nodePositions, activeNode, camera, controls]);
 
   return (
     <motion.div
