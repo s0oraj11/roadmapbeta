@@ -24,6 +24,12 @@ interface MinimapProps {
   activeNode: string | null;
   camera?: THREE.Camera;
   controls?: any;
+  viewport?: {
+    x: number;
+    y: number;
+    zoom: number;
+    transform: [number, number, number];
+  };
 }
 
 const calculateBounds = (positions: [number, number, number][]) => {
@@ -47,7 +53,7 @@ const calculateBounds = (positions: [number, number, number][]) => {
   );
 };
 
-const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNode, camera, controls }) => {
+const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNode, camera, controls, viewport }) => {
   const [containerRef, bounds] = useMeasure();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<{ 
@@ -214,12 +220,24 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNo
         }
       });
 
-      // Draw viewport if camera exists
-      if (camera && controls) {
-        const frustumPoints = getFrustumPoints(camera);
-        const projectedPoints = frustumPoints.map(point => 
-          projectToMinimap(point, bounds.width, bounds.height)
-        );
+      // Draw viewport rectangle if viewport exists
+      if (viewport) {
+        const positions = Array.from(nodePositions.values());
+        const { minX, maxX, minY, maxY } = calculateBounds(positions);
+        
+        const padding = 20;
+        const availableWidth = bounds.width - 2 * padding;
+        const availableHeight = bounds.height - 2 * padding;
+        
+        const scaleX = availableWidth / (maxX - minX);
+        const scaleY = availableHeight / (maxY - minY);
+        const scale = Math.min(scaleX, scaleY);
+
+        // Calculate viewport rectangle in minimap coordinates
+        const vpX = padding + (-viewport.x / viewport.zoom - minX) * scale;
+        const vpY = bounds.height - (padding + (-viewport.y / viewport.zoom - minY) * scale);
+        const vpWidth = (bounds.width / viewport.zoom) * scale;
+        const vpHeight = (bounds.height / viewport.zoom) * scale;
 
         // Draw viewport area with animation
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
@@ -231,19 +249,36 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNo
         ctx.lineDashOffset = dashOffset;
 
         ctx.beginPath();
-        ctx.moveTo(projectedPoints[0][0], projectedPoints[0][1]);
-        projectedPoints.forEach(([x, y]) => {
-          ctx.lineTo(x, y);
-        });
-        ctx.closePath();
+        ctx.rect(vpX, vpY - vpHeight, vpWidth, vpHeight);
         ctx.stroke();
         
         // Fill viewport area
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.fill();
       }
+
+      // Draw camera frustum if camera exists
+      if (camera && controls) {
+        const frustumPoints = getFrustumPoints(camera);
+        const projectedPoints = frustumPoints.map(point => 
+          projectToMinimap(point, bounds.width, bounds.height)
+        );
+
+        // Draw frustum outline
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        
+        ctx.beginPath();
+        ctx.moveTo(projectedPoints[0][0], projectedPoints[0][1]);
+        for (let i = 1; i < projectedPoints.length; i++) {
+          ctx.lineTo(projectedPoints[i][0], projectedPoints[i][1]);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
     };
-  }, [bounds.width, bounds.height, nodes, edges, nodePositions, activeNode, camera, controls, getFrustumPoints, projectToMinimap]);
+  }, [bounds.width, bounds.height, nodes, edges, nodePositions, activeNode, camera, controls, getFrustumPoints, projectToMinimap, viewport]);
 
   useEffect(() => {
     const animate = () => {
