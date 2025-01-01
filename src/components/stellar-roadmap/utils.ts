@@ -20,7 +20,7 @@ export const MINIMAP_CONFIG = {
 export const NODE_TRANSFORM = {
   SCALE_FACTOR: 25,
   OFFSET_X: 0,  
-  OFFSET_Y: -4  
+  OFFSET_Y: -2
 }
 
 export const calculateNodePositions = (nodes: NodeType[]) => {
