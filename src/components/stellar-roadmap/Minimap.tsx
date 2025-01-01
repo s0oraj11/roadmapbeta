@@ -1,15 +1,25 @@
 import React, { useEffect, useRef } from 'react';
 import { Node as FlowNode, Edge } from '@xyflow/react';
 import { motion } from 'framer-motion';
+import * as THREE from 'three';
 
 interface MinimapProps {
   nodes: FlowNode[];
   edges: Edge[];
   nodePositions: Map<string, [number, number, number]>;
   activeNode: string | null;
+  camera?: THREE.Camera;
+  controls?: any;
 }
 
-const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNode }) => {
+const Minimap: React.FC<MinimapProps> = ({ 
+  nodes, 
+  edges, 
+  nodePositions, 
+  activeNode,
+  camera,
+  controls 
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -30,11 +40,77 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNo
     const scaleY = (height - 2 * padding) / (maxY - minY);
     const scale = Math.min(scaleX, scaleY);
     
-    // Flip the Y coordinate by subtracting from height
     return [
       padding + (x - minX) * scale,
-      height - (padding + (y - minY) * scale) // Flip Y coordinate
+      height - (padding + (y - minY) * scale)
     ];
+  };
+
+  // Calculate viewport rectangle
+  const calculateViewportRect = (
+    ctx: CanvasRenderingContext2D, 
+    width: number, 
+    height: number
+  ) => {
+    if (!camera || !controls) return null;
+
+    const frustum = new THREE.Frustum();
+    const projScreenMatrix = new THREE.Matrix4();
+    camera.updateMatrixWorld();
+    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    frustum.setFromProjectionMatrix(projScreenMatrix);
+
+    // Get the corners of the visible area
+    const corners: THREE.Vector3[] = [];
+    const near = camera.near;
+    const far = camera.far;
+    const aspect = camera.aspect;
+    const fov = camera.fov * (Math.PI / 180);
+    
+    const nearHeight = 2 * Math.tan(fov / 2) * near;
+    const nearWidth = nearHeight * aspect;
+    const farHeight = 2 * Math.tan(fov / 2) * far;
+    const farWidth = farHeight * aspect;
+
+    // Calculate corners in world space
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);
+    const cameraPosition = camera.position.clone();
+    const cameraUp = camera.up.clone();
+    const cameraRight = new THREE.Vector3().crossVectors(cameraDirection, cameraUp);
+
+    // Project corners to minimap space
+    const points = [
+      projectToMinimap([
+        cameraPosition.x + cameraRight.x * nearWidth/2,
+        cameraPosition.y + cameraUp.y * nearHeight/2,
+        cameraPosition.z
+      ], width, height),
+      projectToMinimap([
+        cameraPosition.x - cameraRight.x * nearWidth/2,
+        cameraPosition.y + cameraUp.y * nearHeight/2,
+        cameraPosition.z
+      ], width, height),
+      projectToMinimap([
+        cameraPosition.x - cameraRight.x * nearWidth/2,
+        cameraPosition.y - cameraUp.y * nearHeight/2,
+        cameraPosition.z
+      ], width, height),
+      projectToMinimap([
+        cameraPosition.x + cameraRight.x * nearWidth/2,
+        cameraPosition.y - cameraUp.y * nearHeight/2,
+        cameraPosition.z
+      ], width, height)
+    ];
+
+    // Draw viewport rectangle
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    points.forEach(point => ctx.lineTo(point[0], point[1]));
+    ctx.closePath();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   };
 
   useEffect(() => {
@@ -80,22 +156,19 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNo
 
       const [x, y] = projectToMinimap(position, canvas.width / scale, canvas.height / scale);
       
-      // Draw planet
       ctx.beginPath();
       ctx.arc(x, y, node.id === activeNode ? 5 : 3.5, 0, Math.PI * 2);
       
-      // Different colors for different node types
       if (node.id === 'start') {
-        ctx.fillStyle = '#fbbf24'; // Yellow for start node
+        ctx.fillStyle = '#fbbf24';
       } else if (node.className?.includes('pattern')) {
-        ctx.fillStyle = '#818cf8'; // Purple for pattern nodes
+        ctx.fillStyle = '#818cf8';
       } else {
-        ctx.fillStyle = '#22d3ee'; // Cyan for other nodes
+        ctx.fillStyle = '#22d3ee';
       }
       
       ctx.fill();
       
-      // Highlight active node
       if (node.id === activeNode) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.5;
@@ -103,7 +176,10 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNo
       }
     });
 
-  }, [nodes, edges, nodePositions, activeNode]);
+    // Draw viewport rectangle
+    calculateViewportRect(ctx, canvas.width / scale, canvas.height / scale);
+
+  }, [nodes, edges, nodePositions, activeNode, camera, controls]);
 
   return (
     <motion.div
