@@ -208,16 +208,17 @@ const Minimap: React.FC<MinimapProps> = ({
   };
 
   // Project 3D coordinates to 2D
-  const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvasSize: { width: number, height: number }) => {
+const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvasSize: { width: number, height: number }) => {
     const padding = 20;
     const width = canvasSize.width - 2 * padding;
     const height = canvasSize.height - 2 * padding;
     
     const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
-    const y = padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height;
+    // Invert the Y coordinate calculation
+    const y = canvasSize.height - (padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height);
     
     return [x, y] as const;
-  };
+};
 
   // Handle minimap click
   const handleMinimapClick = (event: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
@@ -233,7 +234,8 @@ const Minimap: React.FC<MinimapProps> = ({
     const height = event.currentTarget.clientHeight - 2 * padding;
     
     const sceneX = ((x - padding) / width) * (bounds.maxX - bounds.minX) + bounds.minX;
-    const sceneY = ((y - padding) / height) * (bounds.maxY - bounds.minY) + bounds.minY;
+    // Invert the Y coordinate calculation for click handling
+    const sceneY = (1 - ((y - padding) / height)) * (bounds.maxY - bounds.minY) + bounds.minY;
     
     const targetPosition = new THREE.Vector3(sceneX, sceneY, camera.position.z);
     const startPosition = camera.position.clone();
