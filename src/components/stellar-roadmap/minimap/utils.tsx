@@ -1,4 +1,5 @@
 // components/stellar-roadmap/minimap/utils.ts
+import * as THREE from 'three';
 import { Node } from './types';
 
 export const getNodeColor = (node: Node, activeNode: string | null): string => {
