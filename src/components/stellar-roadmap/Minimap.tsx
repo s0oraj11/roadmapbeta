@@ -63,7 +63,7 @@ useEffect(() => {
   renderer.setSize(192, 144);
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1;
+  renderer.toneMappingExposure = 1.5;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -85,12 +85,23 @@ useEffect(() => {
   minimapControlsRef.current = minimapControls;
 
   // Add lights
-  const ambientLight = new THREE.AmbientLight('#ffffff', 0.2);
+  const ambientLight = new THREE.AmbientLight('#ffffff', 0.4);
   scene.add(ambientLight);
 
-  const directionalLight = new THREE.DirectionalLight('#ffffff', 0.8);
+  const directionalLight = new THREE.DirectionalLight('#ffffff', 0.1);
   directionalLight.position.set(5, 5, 5);
   scene.add(directionalLight);
+
+    // Add a hemisphereLight for better ambient illumination
+  const hemisphereLight = new THREE.HemisphereLight('#ffffff', '#004d99', 0.6);
+  scene.add(hemisphereLight);
+
+  // Update the material properties for nodes
+  const defaultMaterial = new THREE.MeshStandardMaterial({
+    metalness: 0.1,  // Reduced metalness
+    roughness: 0.5,  // Adjusted roughness
+    emissiveIntensity: 0.3  // Increased emissive intensity
+  });
 
   return () => {
     minimapControls.dispose();
@@ -101,6 +112,7 @@ useEffect(() => {
     // Clean up lights
     scene.remove(ambientLight);
     scene.remove(directionalLight);
+    scene.remove(hemisphereLight);
   };
 }, [is3D]);
 
@@ -133,12 +145,12 @@ useEffect(() => {
 
       const geometry = new THREE.SphereGeometry(0.3, 16, 16);
       const material = new THREE.MeshStandardMaterial({ 
-        color: getNodeColor(node, activeNode),
-        metalness: 0.2,
-        roughness: 0.8,
-        emissive: getNodeColor(node, activeNode),
-        emissiveIntensity: 0.2
-      });
+  color: getNodeColor(node, activeNode),
+  metalness: 0.1,
+  roughness: 0.5,
+  emissive: getNodeColor(node, activeNode),
+  emissiveIntensity: 0.3
+});
 
 
       const sphere = new THREE.Mesh(geometry, material);
