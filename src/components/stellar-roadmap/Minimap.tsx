@@ -126,7 +126,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
       style={{
         backdropFilter: 'blur(8px)',
         willChange: 'transform', // Optimize performance
-        transform: 'translateZ(0)' // Force GPU acceleration
+        transform: 'translateZ(0)', // Force GPU acceleration
         position: 'absolute', // Explicitly set position
         pointerEvents: 'auto'
       }}
