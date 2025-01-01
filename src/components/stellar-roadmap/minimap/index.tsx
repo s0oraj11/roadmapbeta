@@ -134,7 +134,7 @@ const Minimap: React.FC<MinimapProps> = ({
             onClick={() => setIs3D(!is3D)}
             className="absolute top-2 right-2 p-1 rounded-md bg-gray-800/80 hover:bg-gray-700/80 transition-colors text-white text-sm"
           >
-            {is3D ? 'Switch to 2D' : 'Switch to 3D'}
+            {is3D ? 'View 2D' : 'View 3D'}
           </button>
         </div>
       </Card>
