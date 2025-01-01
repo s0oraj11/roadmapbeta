@@ -22,7 +22,6 @@ interface MinimapProps {
   camera?: THREE.Camera;
   controls?: any;
   mode?: '2d' | '3d';
-  onViewportChange?: (center: THREE.Vector3, zoom: number) => void;
 }
 
 const Minimap: React.FC<MinimapProps> = ({ 
@@ -40,14 +39,8 @@ const Minimap: React.FC<MinimapProps> = ({
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const minimapCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const minimapControlsRef = useRef<OrbitControls | null>(null);
-  const animationFrameRef = useRef<number>();
   const [is3D, setIs3D] = useState(mode === '3d');
   const [isDragging, setIsDragging] = useState(false);
-
-
-
-
-  
 
   // Initialize 3D scene
   useEffect(() => {
@@ -84,82 +77,6 @@ const Minimap: React.FC<MinimapProps> = ({
       containerRef.current?.removeChild(renderer.domElement);
     };
   }, [is3D]);
-
-
-  // Calculate viewport bounds
-  const calculateViewportBounds = () => {
-    if (!camera) return null;
-    
-    const frustum = new THREE.Frustum();
-    const matrix = new THREE.Matrix4().multiplyMatrices(
-      camera.projectionMatrix,
-      camera.matrixWorldInverse
-    );
-    frustum.setFromProjectionMatrix(matrix);
-
-    const cameraDirection = new THREE.Vector3();
-    camera.getWorldDirection(cameraDirection);
-    const distance = 15;
-    
-    const aspectRatio = 192/144;
-    const vFOV = THREE.MathUtils.degToRad(camera.fov);
-    const height = 2 * Math.tan(vFOV / 2) * distance;
-    const width = height * aspectRatio;
-
-    const cameraRight = new THREE.Vector3().crossVectors(cameraDirection, camera.up).normalize();
-    const cameraUp = new THREE.Vector3().crossVectors(cameraRight, cameraDirection).normalize();
-
-    return {
-      center: camera.position.clone().add(cameraDirection.multiplyScalar(distance)),
-      width,
-      height,
-      right: cameraRight,
-      up: cameraUp
-    };
-  };
-
-  // Calculate global bounds
-  const calculateGlobalBounds = (positions: [number, number, number][]) => {
-    return positions.reduce(
-      (acc, pos) => ({
-        minX: Math.min(acc.minX, pos[0]),
-        maxX: Math.max(acc.maxX, pos[0]),
-        minY: Math.min(acc.minY, pos[1]),
-        maxY: Math.max(acc.maxY, pos[1])
-      }),
-      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-    );
-  };
-
-  // Project 3D coordinates to 2D
-const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvasSize: { width: number, height: number }) => {
-  const padding = 20;
-  const width = canvasSize.width - 2 * padding;
-  const height = canvasSize.height - 2 * padding;
-  
-  const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
-  const y = canvasSize.height - (padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height);
-  
-  return [x, y] as const;
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
 
   // Setup 2D canvas
   useEffect(() => {
@@ -303,7 +220,7 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
     return points.map(point => point.applyMatrix4(camera.matrixWorld));
   };
 
- // Render 2D view
+  // Render 2D view
   const render2D = useMemo(() => {
     return () => {
       if (!canvasRef.current || is3D) return;
@@ -311,12 +228,31 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      canvas.width = 192;
-      canvas.height = 144;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // Calculate bounds
       const positions = Array.from(nodePositions.values());
-      const bounds = calculateGlobalBounds(positions);
+      const bounds = positions.reduce(
+        (acc, pos) => ({
+          minX: Math.min(acc.minX, pos[0]),
+          maxX: Math.max(acc.maxX, pos[0]),
+          minY: Math.min(acc.minY, pos[1]),
+          maxY: Math.max(acc.maxY, pos[1])
+        }),
+        { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+      );
+
+      // Project 3D to 2D
+      const project = (pos: [number, number, number]): [number, number] => {
+        const padding = 20;
+        const width = canvas.width - 2 * padding;
+        const height = canvas.height - 2 * padding;
+        
+        const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
+        const y = canvas.height - (padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height);
+        
+        return [x, y];
+      };
 
       // Draw edges
       ctx.lineWidth = 1;
@@ -325,8 +261,8 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
         const endPos = nodePositions.get(edge.target);
         
         if (startPos && endPos) {
-          const [x1, y1] = projectToCanvas(startPos, bounds, { width: canvas.width, height: canvas.height });
-          const [x2, y2] = projectToCanvas(endPos, bounds, { width: canvas.width, height: canvas.height });
+          const [x1, y1] = project(startPos);
+          const [x2, y2] = project(endPos);
           
           ctx.shadowColor = 'rgba(71, 85, 105, 0.5)';
           ctx.shadowBlur = 4;
@@ -344,7 +280,7 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
         const position = nodePositions.get(node.id);
         if (!position) return;
 
-        const [x, y] = projectToCanvas(position, bounds, { width: canvas.width, height: canvas.height });
+        const [x, y] = project(position);
         
         ctx.shadowColor = node.id === activeNode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)';
         ctx.shadowBlur = 6;
@@ -353,20 +289,13 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
         ctx.arc(x, y, node.id === activeNode ? 6 : 4, 0, Math.PI * 2);
         
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, node.id === activeNode ? 6 : 4);
-        if (node.id === 'start') {
-          gradient.addColorStop(0, '#fef3c7');
-          gradient.addColorStop(1, '#fbbf24');
-        } else if (node.className?.includes('pattern')) {
-          gradient.addColorStop(0, '#e0e7ff');
-          gradient.addColorStop(1, '#818cf8');
-        } else {
-          gradient.addColorStop(0, '#cffafe');
-          gradient.addColorStop(1, '#22d3ee');
-        }
+        const colors = getNodeColors(node);
+        gradient.addColorStop(0, colors[0]);
+        gradient.addColorStop(1, colors[1]);
         
         ctx.fillStyle = gradient;
         ctx.fill();
-
+        
         if (node.id === activeNode) {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2;
@@ -374,41 +303,31 @@ const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeo
         }
       });
 
-      // Draw viewport with animated dotted lines
+      // Draw camera viewport
       if (camera) {
-        const viewportBounds = calculateViewportBounds();
-        if (viewportBounds) {
-          const center = viewportBounds.center;
-          const [cx, cy] = projectToCanvas([center.x, center.y, center.z], bounds, { width: canvas.width, height: canvas.height });
-          
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([4, 4]);
-          ctx.lineDashOffset = (Date.now() / 50) % 8;
-          
-          const vpWidth = viewportBounds.width * (canvas.width / (bounds.maxX - bounds.minX));
-          const vpHeight = viewportBounds.height * (canvas.height / (bounds.maxY - bounds.minY));
-          
-          ctx.beginPath();
-          ctx.rect(
-            cx - vpWidth / 2,
-            cy - vpHeight / 2,
-            vpWidth,
-            vpHeight
-          );
-          ctx.stroke();
-          
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-          ctx.fill();
-          
-          ctx.setLineDash([]);
-        }
-      }
+        const viewportPoints = getViewportPoints(camera);
+        const projectedPoints = viewportPoints.map(point => 
+          project([point.x, point.y, point.z])
+        );
 
-      requestAnimationFrame(render2D);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.lineDashOffset = (Date.now() / 50) % 8;
+
+        ctx.beginPath();
+        ctx.moveTo(projectedPoints[0][0], projectedPoints[0][1]);
+        projectedPoints.forEach(([x, y]) => {
+          ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fill();
+      }
     };
   }, [nodes, edges, nodePositions, activeNode, camera, is3D]);
-
 
   // Animation loop
   useEffect(() => {
