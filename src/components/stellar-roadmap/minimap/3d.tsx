@@ -1,9 +1,6 @@
-// minimap/3d.tsx
+// components/stellar-roadmap/minimap/3d.tsx
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
 import { MinimapProps } from './types';
 import { getNodeColor } from './utils';
 
@@ -20,12 +17,10 @@ export const setup3DScene = (
   });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(192, 144);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1;
   container.appendChild(renderer.domElement);
 
   const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
-  minimapCamera.position.set(0, 10, 10);
+  minimapCamera.position.set(0, 15, 15);
   minimapCamera.lookAt(0, 0, 0);
 
   const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
@@ -35,58 +30,17 @@ export const setup3DScene = (
   minimapControls.zoomSpeed = 0.5;
   onControlsRef(minimapControls);
 
-  // Post-processing
-  const composer = new EffectComposer(renderer);
-  const renderPass = new RenderPass(scene, minimapCamera);
-  composer.addPass(renderPass);
-
-  const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(192, 144),
-    1.5, // intensity
-    0.4, // radius
-    0.85 // threshold
-  );
-  composer.addPass(bloomPass);
-
   return {
     scene,
     renderer,
     camera: minimapCamera,
     controls: minimapControls,
-    composer,
     cleanup: () => {
       minimapControls.dispose();
       renderer.dispose();
       container.removeChild(renderer.domElement);
     }
   };
-};
-
-const createTorchEffect = (frustumMesh: THREE.Mesh, scene: THREE.Scene) => {
-  const torchLight = new THREE.SpotLight('#ffffff', 2);
-  torchLight.position.set(0, 0, 0);
-  torchLight.angle = Math.PI / 6;
-  torchLight.penumbra = 0.3;
-  torchLight.decay = 2;
-  torchLight.distance = 20;
-  
-  const volumetricLight = new THREE.Mesh(
-    new THREE.ConeGeometry(2, 10, 32),
-    new THREE.MeshBasicMaterial({
-      color: '#ffffff',
-      transparent: true,
-      opacity: 0.1,
-      side: THREE.BackSide,
-      blending: THREE.AdditiveBlending
-    })
-  );
-  volumetricLight.rotation.x = Math.PI;
-  torchLight.add(volumetricLight);
-  
-  frustumMesh.add(torchLight);
-
-  const ambientLight = new THREE.AmbientLight('#ffffff', 0.2);
-  scene.add(ambientLight);
 };
 
 export const update3DScene = (
@@ -98,36 +52,28 @@ export const update3DScene = (
   camera?: THREE.Camera,
   controls?: OrbitControls
 ) => {
-  scene.clear();
+  while(scene.children.length > 0) {
+    scene.remove(scene.children[0]);
+  }
 
-  // Add nodes with enhanced materials
+  // Add nodes
   nodes.forEach(node => {
     const position = nodePositions.get(node.id);
     if (!position) return;
 
-    const geometry = new THREE.SphereGeometry(0.3, 32, 32);
-    const material = new THREE.MeshPhysicalMaterial({ 
-      color: getNodeColor(node, activeNode),
-      metalness: 0.9,
-      roughness: 0.1,
-      envMapIntensity: 0.9,
-      clearcoat: 1,
-      clearcoatRoughness: 0.1
+    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+    const material = new THREE.MeshBasicMaterial({ 
+      color: getNodeColor(node, activeNode)
     });
-
     const sphere = new THREE.Mesh(geometry, material);
     sphere.position.set(...position);
     
     if (node.id === activeNode) {
-      material.emissive = new THREE.Color('#fbbf24');
-      material.emissiveIntensity = 0.5;
-      
-      const glowGeometry = new THREE.SphereGeometry(0.4, 32, 32);
+      const glowGeometry = new THREE.SphereGeometry(0.4, 16, 16);
       const glowMaterial = new THREE.MeshBasicMaterial({
-        color: '#fbbf24',
+        color: '#ffffff',
         transparent: true,
-        opacity: 0.3,
-        blending: THREE.AdditiveBlending
+        opacity: 0.3
       });
       const glow = new THREE.Mesh(glowGeometry, glowMaterial);
       sphere.add(glow);
@@ -136,7 +82,7 @@ export const update3DScene = (
     scene.add(sphere);
   });
 
-  // Enhanced edges with gradient effect
+  // Add edges with glow effect
   edges.forEach(edge => {
     const startPos = nodePositions.get(edge.source);
     const endPos = nodePositions.get(edge.target);
@@ -149,11 +95,11 @@ export const update3DScene = (
     ];
     
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    
     const material = new THREE.LineBasicMaterial({ 
       color: '#4b5563',
       transparent: true,
-      opacity: 0.8,
-      linewidth: 2
+      opacity: 0.6
     });
     const line = new THREE.Line(geometry, material);
     scene.add(line);
@@ -161,9 +107,8 @@ export const update3DScene = (
     const glowMaterial = new THREE.LineBasicMaterial({
       color: '#6b7280',
       transparent: true,
-      opacity: 0.4,
-      linewidth: 3,
-      blending: THREE.AdditiveBlending
+      opacity: 0.2,
+      linewidth: 2
     });
     const glowLine = new THREE.Line(geometry, glowMaterial);
     scene.add(glowLine);
@@ -175,14 +120,11 @@ export const update3DScene = (
       color: '#ffffff',
       opacity: 0.2,
       transparent: true,
-      wireframe: true,
-      blending: THREE.AdditiveBlending
+      wireframe: true
     });
     
     const frustumMesh = new THREE.Mesh(frustumGeometry, material);
     scene.add(frustumMesh);
-
-    createTorchEffect(frustumMesh, scene);
 
     const updateFrustum = () => {
       const frustum = new THREE.Frustum();
