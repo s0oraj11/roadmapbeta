@@ -6,12 +6,12 @@ const StellarRoadmap = lazy(() => import('@/components/stellar-roadmap/index'))
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
-      <div className="max-w-full mx-auto px-4 pt-1">
+      <div className="max-w-full mx-auto px-4 py-6">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="h-[calc(100vh-0.5rem)]"
+          className="h-[calc(100vh-3rem)]"
         >
           <Suspense fallback={
             <div className="flex items-center justify-center h-full">
