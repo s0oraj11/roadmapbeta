@@ -180,6 +180,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       />
       <Minimap 
         nodes={nodes}
+        edges={edges} 
         nodePositions={nodePositions}
         activeNode={activeNode}
         />
