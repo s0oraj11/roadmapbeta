@@ -43,78 +43,40 @@ const Minimap: React.FC<MinimapProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   // Initialize 3D scene
-useEffect(() => {
-  if (!containerRef.current || !is3D) return;
+  useEffect(() => {
+    if (!containerRef.current || !is3D) return;
 
-  // Create scene
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#0f172a');
-  sceneRef.current = scene;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#0f172a');
+    sceneRef.current = scene;
 
-  // Create renderer with new color space setting
-  const renderer = new THREE.WebGLRenderer({ 
-    antialias: true,
-    alpha: true,
-    powerPreference: "high-performance"
-  });
-  
-  // Configure renderer
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(192, 144);
-  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.5;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: true
+    });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(192, 144);
+    containerRef.current.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
-  containerRef.current.appendChild(renderer.domElement);
-  rendererRef.current = renderer;
+    const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
+    minimapCamera.position.set(0, 15, 15);
+    minimapCamera.lookAt(0, 0, 0);
+    minimapCameraRef.current = minimapCamera;
 
-  // Create and configure camera
-  const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
-  minimapCamera.position.set(0, 15, 15);
-  minimapCamera.lookAt(0, 0, 0);
-  minimapCameraRef.current = minimapCamera;
+    const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
+    minimapControls.enableDamping = true;
+    minimapControls.dampingFactor = 0.05;
+    minimapControls.rotateSpeed = 0.5;
+    minimapControls.zoomSpeed = 0.5;
+    minimapControlsRef.current = minimapControls;
 
-  // Create controls
-  const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
-  minimapControls.enableDamping = true;
-  minimapControls.dampingFactor = 0.05;
-  minimapControls.rotateSpeed = 0.5;
-  minimapControls.zoomSpeed = 0.5;
-  minimapControlsRef.current = minimapControls;
-
-  // Add lights
-  const ambientLight = new THREE.AmbientLight('#ffffff', 0.4);
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight('#ffffff', 0.1);
-  directionalLight.position.set(5, 5, 5);
-  scene.add(directionalLight);
-
-    // Add a hemisphereLight for better ambient illumination
-  const hemisphereLight = new THREE.HemisphereLight('#ffffff', '#004d99', 0.6);
-  scene.add(hemisphereLight);
-
-  // Update the material properties for nodes
-  const defaultMaterial = new THREE.MeshStandardMaterial({
-    metalness: 0.1,  // Reduced metalness
-    roughness: 0.5,  // Adjusted roughness
-    emissiveIntensity: 0.3  // Increased emissive intensity
-  });
-
-  return () => {
-    minimapControls.dispose();
-    renderer.dispose();
-    if (containerRef.current) {
-      containerRef.current.removeChild(renderer.domElement);
-    }
-    // Clean up lights
-    scene.remove(ambientLight);
-    scene.remove(directionalLight);
-    scene.remove(hemisphereLight);
-  };
-}, [is3D]);
+    return () => {
+      minimapControls.dispose();
+      renderer.dispose();
+      containerRef.current?.removeChild(renderer.domElement);
+    };
+  }, [is3D]);
 
   // Setup 2D canvas
   useEffect(() => {
@@ -144,20 +106,11 @@ useEffect(() => {
       if (!position) return;
 
       const geometry = new THREE.SphereGeometry(0.3, 16, 16);
-      const material = new THREE.MeshStandardMaterial({ 
-  color: getNodeColor(node, activeNode),
-  metalness: 0.1,
-  roughness: 0.5,
-  emissive: getNodeColor(node, activeNode),
-  emissiveIntensity: 0.3
-});
-
-
+      const material = new THREE.MeshBasicMaterial({ 
+        color: getNodeColor(node, activeNode)
+      });
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(...position);
-      sphere.material = material;
-      sphere.castShadow = true;
-      sphere.receiveShadow = true;
       
       if (node.id === activeNode) {
         const glowGeometry = new THREE.SphereGeometry(0.4, 16, 16);
@@ -237,49 +190,6 @@ useEffect(() => {
         controls.addEventListener('change', updateFrustum);
         return () => controls.removeEventListener('change', updateFrustum);
       }
-
-      // Add spotlight for torch effect
-if (camera && is3D) {
-  // Add a spotlight
-  const spotlight = new THREE.SpotLight('#ffffff', 2);
-  spotlight.angle = Math.PI / 6; // 30 degrees
-  spotlight.penumbra = 0.3;
-  spotlight.decay = 1.5;
-  spotlight.distance = 30;
-  
-  // Position the spotlight slightly above and behind the camera
-  const spotlightOffset = new THREE.Vector3(0, 2, 2);
-  spotlight.position.copy(camera.position).add(spotlightOffset);
-  
-  // Point the spotlight at the center of the scene
-  const targetObject = new THREE.Object3D();
-  sceneRef.current.add(targetObject);
-  spotlight.target = targetObject;
-  
-  // Add subtle ambient light to prevent complete darkness
-  const ambientLight = new THREE.AmbientLight('#ffffff', 0.2);
-  
-  sceneRef.current.add(spotlight);
-  sceneRef.current.add(ambientLight);
-  
-  // Update spotlight position when camera moves
-  if (controls) {
-    const updateSpotlight = () => {
-      spotlight.position.copy(camera.position).add(spotlightOffset);
-      const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      targetObject.position.copy(camera.position).add(direction.multiplyScalar(10));
-    };
-    
-    controls.addEventListener('change', updateSpotlight);
-    return () => controls.removeEventListener('change', updateSpotlight);
-  }
-}
-
-
-
-
-      
     }
   }, [nodes, edges, nodePositions, activeNode, camera, controls, is3D]);
 
