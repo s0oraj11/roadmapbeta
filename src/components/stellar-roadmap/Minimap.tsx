@@ -1,15 +1,15 @@
 import React, { useEffect, useRef } from 'react';
-import { Node as FlowNode } from '@xyflow/react';
+import { Node as FlowNode, Edge } from '@xyflow/react';
 import { motion } from 'framer-motion';
 
 interface MinimapProps {
   nodes: FlowNode[];
-  edges: FlowEdge[];
+  edges: Edge[];
   nodePositions: Map<string, [number, number, number]>;
   activeNode: string | null;
 }
 
-const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) => {
+const Minimap: React.FC<MinimapProps> = ({ nodes, edges, nodePositions, activeNode }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -108,10 +108,10 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
   return (
     <motion.div
       ref={containerRef}
-      initial={{ opacity: 1 }} // Changed from 0 to 1
+      initial={{ opacity: 1 }}
       animate={{ 
         opacity: 1,
-        y: 0    // Ensure it stays in position
+        y: 0
       }}
       transition={{
         duration: 0.3,
@@ -119,25 +119,25 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
         stiffness: 260,
         damping: 20
       }}
-      className="fixed bottom-4 right-4 w-48 h-36 bg-gray-900/70 rounded-md border border-gray-800 overflow-hidden shadow-lg z-50" // Added z-50 and changed absolute to fixed
+      className="fixed bottom-4 right-4 w-48 h-36 bg-gray-900/70 rounded-md border border-gray-800 overflow-hidden shadow-lg z-50"
       style={{
         backdropFilter: 'blur(8px)',
-        willChange: 'transform', // Optimize performance
-        transform: 'translateZ(0)', // Force GPU acceleration
-        position: 'absolute', // Explicitly set position
+        willChange: 'transform',
+        transform: 'translateZ(0)',
+        position: 'absolute',
         pointerEvents: 'auto'
       }}
     >
-      <div className="relative w-full h-full"> {/* Added wrapper div */}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-        style={{
-          display: 'block',
-          position: 'relative', // Ensure canvas stays within container
-          zIndex: 1
-        }}
-      />
+      <div className="relative w-full h-full">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full"
+          style={{
+            display: 'block',
+            position: 'relative',
+            zIndex: 1
+          }}
+        />
       </div>
     </motion.div>
   );
