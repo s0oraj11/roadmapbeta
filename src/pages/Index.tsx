@@ -6,7 +6,7 @@ const StellarRoadmap = lazy(() => import('@/components/stellar-roadmap/index'))
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
-      <div className="max-w-full mx-auto px-4 py-6">
+      <div className="max-w-full mx-auto px-4 py-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
