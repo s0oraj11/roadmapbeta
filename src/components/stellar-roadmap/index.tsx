@@ -23,22 +23,23 @@ interface StellarRoadmapProps {
 
 const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Camera) => void }) => {
   const { camera, scene } = useThree()
-  
   useEffect(() => {
     camera.position.set(...CAMERA_SETTINGS.INITIAL_POSITION)
     camera.lookAt(0, 0, 0)
-    
-    // Calculate scene size and adjust distance
+    // Calculate scene bounds
     const box = new THREE.Box3().setFromObject(scene)
     const size = box.getSize(new THREE.Vector3())
-    const distance = Math.max(size.x, size.y) / Math.tan((camera.fov * Math.PI) / 360)
-    // Reduce the calculated distance by multiplying with a factor less than 1
-    camera.position.z = Math.max(distance * 0.3, CAMERA_SETTINGS.INITIAL_POSITION[2])
-    
+    const maxDimension = Math.max(size.x, size.y)
+    // Calculate FOV and distance relative to scene size
+    const aspectRatio = window.innerWidth / window.innerHeight
+    const fov = 2 * Math.atan((maxDimension / aspectRatio) / (2 * CAMERA_SETTINGS.INITIAL_POSITION[2])) * (180 / Math.PI)
+    camera.fov = Math.min(fov * 1.2, 50) // Scale FOV by 1.2 and cap at 50 degrees
+    // Set distance based on FOV and scene size
+    const distance = maxDimension / (2 * Math.tan((camera.fov * Math.PI) / 360))
+    camera.position.z = Math.max(distance * 0.8, CAMERA_SETTINGS.INITIAL_POSITION[2])
     camera.updateProjectionMatrix()
     onCameraReady(camera)
   }, [camera, scene, onCameraReady])
-  
   return null
 }
 
