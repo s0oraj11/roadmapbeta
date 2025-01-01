@@ -58,7 +58,7 @@ const Minimap: React.FC<MinimapProps> = ({ nodes, nodePositions, activeNode }) =
     // Draw connecting lines
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 1;
-    nodes.forEach(edge => {
+    edges.forEach(edge => {
       const startPos = nodePositions.get(edge.source);
       const endPos = nodePositions.get(edge.target);
       
