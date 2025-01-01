@@ -170,7 +170,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="relative w-full h-[800px] bg-gray-950 rounded-lg overflow-hidden"
+      className="relative w-full h-full rounded-lg overflow-hidden bg-gray-950"
     >
       <ControlButtons 
         isLocked={isLocked}
@@ -185,7 +185,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
         activeNode={activeNode}
         camera={camera}  
         controls={controlsRef.current}
-        />
+      />
 
       <Canvas>
         <CameraController onCameraReady={handleCameraReady} />
