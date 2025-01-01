@@ -418,7 +418,7 @@ if (camera) {
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
       animate={{ opacity: 0.95, scale: 1, y: 0 }}
       transition={{ duration: 0.3, type: "spring", stiffness: 260, damping: 20 }}
-      className="absolute bottom-4 left-16 z-50"
+      className="absolute bottom-4 right-4 z-50"
     >
       <Card className="w-48 h-36 overflow-hidden shadow-xl">
         <div className="relative w-full h-full bg-gray-900/90 backdrop-blur-md">
