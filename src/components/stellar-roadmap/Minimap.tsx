@@ -44,6 +44,11 @@ const Minimap: React.FC<MinimapProps> = ({
   const [is3D, setIs3D] = useState(mode === '3d');
   const [isDragging, setIsDragging] = useState(false);
 
+
+
+
+  
+
   // Initialize 3D scene
   useEffect(() => {
     if (!containerRef.current || !is3D) return;
@@ -79,6 +84,82 @@ const Minimap: React.FC<MinimapProps> = ({
       containerRef.current?.removeChild(renderer.domElement);
     };
   }, [is3D]);
+
+
+  // Calculate viewport bounds
+  const calculateViewportBounds = () => {
+    if (!camera) return null;
+    
+    const frustum = new THREE.Frustum();
+    const matrix = new THREE.Matrix4().multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
+    frustum.setFromProjectionMatrix(matrix);
+
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);
+    const distance = 15;
+    
+    const aspectRatio = 192/144;
+    const vFOV = THREE.MathUtils.degToRad(camera.fov);
+    const height = 2 * Math.tan(vFOV / 2) * distance;
+    const width = height * aspectRatio;
+
+    const cameraRight = new THREE.Vector3().crossVectors(cameraDirection, camera.up).normalize();
+    const cameraUp = new THREE.Vector3().crossVectors(cameraRight, cameraDirection).normalize();
+
+    return {
+      center: camera.position.clone().add(cameraDirection.multiplyScalar(distance)),
+      width,
+      height,
+      right: cameraRight,
+      up: cameraUp
+    };
+  };
+
+  // Calculate global bounds
+  const calculateGlobalBounds = (positions: [number, number, number][]) => {
+    return positions.reduce(
+      (acc, pos) => ({
+        minX: Math.min(acc.minX, pos[0]),
+        maxX: Math.max(acc.maxX, pos[0]),
+        minY: Math.min(acc.minY, pos[1]),
+        maxY: Math.max(acc.maxY, pos[1])
+      }),
+      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+    );
+  };
+
+  // Project 3D coordinates to 2D
+const projectToCanvas = (pos: [number, number, number], bounds: ReturnType<typeof calculateGlobalBounds>, canvasSize: { width: number, height: number }) => {
+  const padding = 20;
+  const width = canvasSize.width - 2 * padding;
+  const height = canvasSize.height - 2 * padding;
+  
+  const x = padding + ((pos[0] - bounds.minX) / (bounds.maxX - bounds.minX)) * width;
+  const y = canvasSize.height - (padding + ((pos[1] - bounds.minY) / (bounds.maxY - bounds.minY)) * height);
+  
+  return [x, y] as const;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
 
   // Setup 2D canvas
   useEffect(() => {
