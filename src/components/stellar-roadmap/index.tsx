@@ -240,7 +240,7 @@ const handleReset = useCallback(() => {
     const center = bbox.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y);
     const fov = camera.fov * (Math.PI / 180);
-    const distance = (maxDim / Math.tan(fov / 2)) * 0.3; // Matched with your zoom factor
+    const distance = (maxDim / Math.tan(fov / 2)) * 0.325; // Matched with your zoom factor
     
     // Set new camera position and target with vertical adjustment
     camera.position.set(
