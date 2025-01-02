@@ -27,23 +27,83 @@ const Minimap: React.FC<MinimapProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   // Initialize 3D scene
-  useEffect(() => {
-    if (!containerRef.current || !is3D) return;
+useEffect(() => {
+  if (!containerRef.current || !is3D) return;
 
-    const { scene, renderer, camera, controls, cleanup } = setup3DScene(
-      containerRef.current,
-      (controls) => {
-        minimapControlsRef.current = controls;
-      }
-    );
+  // Create scene
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#0f172a');
+  sceneRef.current = scene;
 
-    sceneRef.current = scene;
-    rendererRef.current = renderer;
-    minimapCameraRef.current = camera;
+  // Create renderer
+  const renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    alpha: true,
+    powerPreference: "high-performance"
+  });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(192, 144);
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.5;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    return cleanup;
-  }, [is3D]);
+  containerRef.current.appendChild(renderer.domElement);
+  rendererRef.current = renderer;
 
+  // Create and configure camera with closer view
+  const minimapCamera = new THREE.PerspectiveCamera(60, 192/144, 0.1, 1000);
+  minimapCamera.position.set(0, 4, 4);
+  minimapCamera.lookAt(0, 0, 0);
+  minimapCameraRef.current = minimapCamera;
+
+  // Create and configure controls with limits
+  const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
+  minimapControls.enableDamping = true;
+  minimapControls.dampingFactor = 0.05;
+  minimapControls.rotateSpeed = 0.5;
+  minimapControls.zoomSpeed = 0.5;
+  minimapControls.minDistance = 4;
+  minimapControls.maxDistance = 20;
+  minimapControls.maxPolarAngle = Math.PI / 2;
+  minimapControlsRef.current = minimapControls;
+
+  // Add lights
+  const ambientLight = new THREE.AmbientLight('#ffffff', 0.4);
+  scene.add(ambientLight);
+
+  const directionalLight = new THREE.DirectionalLight('#ffffff', 1.0);
+  directionalLight.position.set(5, 10, 5);
+  scene.add(directionalLight);
+
+  const hemisphereLight = new THREE.HemisphereLight('#ffffff', '#004d99', 0.6);
+  scene.add(hemisphereLight);
+
+  return () => {
+    minimapControls.dispose();
+    renderer.dispose();
+    if (containerRef.current) {
+      containerRef.current.removeChild(renderer.domElement);
+    }
+    scene.remove(ambientLight);
+    scene.remove(directionalLight);
+    scene.remove(hemisphereLight);
+  };
+}, [is3D]);
+//setting the initial view
+useEffect(() => {
+  if (!minimapCameraRef.current || !minimapControlsRef.current || !is3D) return;
+
+  // Set initial zoom level
+  minimapCameraRef.current.position.set(0, 4, 4);
+  minimapCameraRef.current.lookAt(0, 0, 0);
+  minimapControlsRef.current.update();
+
+}, [is3D]);
+
+
+  
   // Setup 2D canvas
   useEffect(() => {
     if (!canvasRef.current || is3D) return;
