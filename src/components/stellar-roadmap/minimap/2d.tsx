@@ -1,5 +1,3 @@
-
-// components/stellar-roadmap/minimap/2d.tsx
 import React from 'react';
 import { MinimapProps } from './types';
 import { getNodeColors, getViewportPoints } from './utils';
@@ -7,7 +5,6 @@ import { getNodeColors, getViewportPoints } from './utils';
 export const setup2DCanvas = (canvas: HTMLCanvasElement) => {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-
   const dpr = window.devicePixelRatio || 1;
   canvas.width = canvas.offsetWidth * dpr;
   canvas.height = canvas.offsetHeight * dpr;
@@ -24,7 +21,6 @@ export const render2D = (
 ) => {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Calculate bounds
@@ -69,6 +65,20 @@ export const render2D = (
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
+
+      // Add directional animation only for edges connected to active node
+      if (edge.source === activeNode || edge.target === activeNode) {
+        ctx.shadowColor = 'rgba(71, 85, 105, 0.5)';
+        ctx.shadowBlur = 4;
+        ctx.strokeStyle = '#6b7280';
+        ctx.setLineDash([4, 8]);
+        ctx.lineDashOffset = -Date.now() / 100; // Negative for downward flow
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
   });
 
@@ -76,7 +86,6 @@ export const render2D = (
   nodes.forEach(node => {
     const position = nodePositions.get(node.id);
     if (!position) return;
-
     const [x, y] = project(position);
     
     ctx.shadowColor = node.id === activeNode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)';
@@ -100,12 +109,12 @@ export const render2D = (
     }
   });
 
+  // Draw viewport with moving split lines
   if (camera) {
     const viewportPoints = getViewportPoints(camera);
     const projectedPoints = viewportPoints.map(point => 
       project([point.x, point.y, point.z])
     );
-
     ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.beginPath();
     ctx.moveTo(projectedPoints[0][0], projectedPoints[0][1]);
@@ -114,7 +123,6 @@ export const render2D = (
     });
     ctx.closePath();
     ctx.fill();
-
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 4]);
