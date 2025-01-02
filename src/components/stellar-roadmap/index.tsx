@@ -24,35 +24,108 @@ interface StellarRoadmapProps {
 
 const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Camera) => void }) => {
   const { camera, scene } = useThree()
+  const initialSetupDone = useRef(false)
   
+  // Calculate optimal camera settings based on scene content
+  const calculateOptimalView = useCallback(() => {
+    // Calculate scene bounds including all nodes
+    const box = new THREE.Box3().setFromObject(scene)
+    const size = box.getSize(new THREE.Vector3())
+    const center = box.getCenter(new THREE.Vector3())
+    
+    // Calculate optimal distance based on scene size and aspect ratio
+    const aspectRatio = window.innerWidth / window.innerHeight
+    const maxDimension = Math.max(size.x, size.y, size.z)
+    const fov = camera.fov * (Math.PI / 180)
+    
+    // Add padding factor for consistent spacing
+    const paddingFactor = 1.2
+    
+    // Calculate base distance needed to fit scene
+    let distance = (maxDimension / 2) / Math.tan(fov / 2) * paddingFactor
+    
+    // Adjust for aspect ratio
+    if (aspectRatio < 1) {
+      // Mobile/portrait: need more distance to fit width
+      distance *= (1 + (1 - aspectRatio))
+    }
+    
+    // Ensure distance is within bounds
+    distance = Math.max(
+      Math.min(distance, CAMERA_SETTINGS.MAX_DISTANCE * 0.5),
+      CAMERA_SETTINGS.MIN_DISTANCE * 2
+    )
+    
+    return { center, distance }
+  }, [camera, scene])
+
+  // Initial setup
   useEffect(() => {
-    // First, let's wait a frame to ensure nodes are rendered
-    requestAnimationFrame(() => {
-      // Calculate scene bounds including all nodes
-      const box = new THREE.Box3().setFromObject(scene)
-      const size = box.getSize(new THREE.Vector3())
-      const center = box.getCenter(new THREE.Vector3())
+    if (!initialSetupDone.current) {
+      const setupCamera = () => {
+        const { center, distance } = calculateOptimalView()
+        
+        // Position camera for top-down view with slight angle
+        camera.position.set(
+          center.x,
+          center.y + distance * 0.3, // Add elevation for perspective
+          center.z + distance
+        )
+        
+        camera.lookAt(center)
+        camera.updateProjectionMatrix()
+        
+        // Update orbit controls if available
+        if (scene.userData.controls) {
+          scene.userData.controls.target.set(center.x, center.y, center.z)
+          scene.userData.controls.update()
+        }
+        
+        onCameraReady(camera)
+        initialSetupDone.current = true
+      }
       
-      // Calculate optimal distance based on scene size
-      const maxDimension = Math.max(size.x, size.y, size.z)
-      const aspectRatio = window.innerWidth / window.innerHeight
-      const fov = camera.fov * (Math.PI / 180)
-      const distance = (maxDimension / 2) / Math.tan(fov / 2)
-      
-      // Position camera to view entire scene
-      camera.position.set(
-        center.x,
-        center.y + distance * 0.5,
-        center.z + distance
-      )
-      
-      // Look at center of scene
-      camera.lookAt(center)
-      camera.updateProjectionMatrix()
-      
-      onCameraReady(camera)
-    })
-  }, [camera, scene, onCameraReady])
+      // Wait for scene to be ready
+      requestAnimationFrame(() => {
+        setupCamera()
+      })
+    }
+  }, [camera, scene, calculateOptimalView, onCameraReady])
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (initialSetupDone.current) {
+        const { center, distance } = calculateOptimalView()
+        
+        // Smoothly update camera position
+        const newPosition = new THREE.Vector3(
+          center.x,
+          center.y + distance * 0.3,
+          center.z + distance
+        )
+        
+        camera.position.lerp(newPosition, 0.5)
+        camera.lookAt(center)
+        camera.updateProjectionMatrix()
+        
+        if (scene.userData.controls) {
+          scene.userData.controls.target.set(center.x, center.y, center.z)
+          scene.userData.controls.update()
+        }
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [camera, scene, calculateOptimalView])
+
+  // Ensure proper cleanup
+  useEffect(() => {
+    return () => {
+      initialSetupDone.current = false
+    }
+  }, [])
 
   return null
 }
