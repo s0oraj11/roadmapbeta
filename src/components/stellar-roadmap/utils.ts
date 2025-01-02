@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { NodeType } from './types'
 
 export const CAMERA_SETTINGS = {
-  INITIAL_POSITION: [0, 2, 10] as const,
+  INITIAL_POSITION: [0, 2, 5] as const,
   MIN_DISTANCE: 5,
   MAX_DISTANCE: 100,
   ZOOM_IN_FACTOR: 0.75,
