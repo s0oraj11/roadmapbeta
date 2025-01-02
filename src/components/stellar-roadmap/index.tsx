@@ -225,8 +225,7 @@ const StellarRoadmap: React.FC<StellarRoadmapProps> = ({ nodes: flowNodes, edges
 
 
 
-  
-const handleReset = useCallback(() => {
+  const handleReset = useCallback(() => {
   if (controlsRef.current && camera) {
     // Calculate bounding box of all nodes
     const positions = Array.from(nodePositions.values());
@@ -240,28 +239,31 @@ const handleReset = useCallback(() => {
     const center = bbox.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y);
     const fov = camera.fov * (Math.PI / 180);
-    const distance = (maxDim / Math.tan(fov / 2)) * 0.4; // Matched with your zoom factor
+    const distance = (maxDim / Math.tan(fov / 2)) * 0.4; // Keep the 0.4 zoom factor as it works well
     
-    // Set new camera position and target with vertical adjustment
+    // Calculate vertical offset
+    const verticalOffset = distance * 0.05; // New proportional offset
+    
+    // Set new camera position and target with adjusted vertical offset
     camera.position.set(
       center.x,
-      center.y - distance * 0.2, // Added vertical adjustment
+      center.y - verticalOffset,
       center.z + distance
     );
     controlsRef.current.target.set(
       center.x,
-      center.y - distance * 0.2, // Matched target adjustment
+      center.y - verticalOffset,
       center.z
     );
     camera.updateProjectionMatrix();
     controlsRef.current.update();
     
+    // Reset state
     setActiveNode(null);
     setSelectedNode(null);
     setNodePositions(calculateNodePositions(nodes));
   }
 }, [camera, nodes, nodePositions]);
-
 
   
 
