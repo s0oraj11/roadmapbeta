@@ -1,150 +1,145 @@
-// components/stellar-roadmap/minimap/3d.tsx
+// components/stellar-roadmap/minimap/index.tsx
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { motion } from 'framer-motion';
+import { Card } from '@/components/ui/card';
 import { MinimapProps } from './types';
-import { getNodeColor } from './utils';
+import { setup2DCanvas, render2D } from './2d';
+import { setup3DScene, update3DScene } from './3d';
 
-export const setup3DScene = (
-  container: HTMLDivElement,
-  onControlsRef: (controls: OrbitControls) => void
-) => {
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#0f172a');
+const Minimap: React.FC<MinimapProps> = ({ 
+  nodes, 
+  edges, 
+  nodePositions, 
+  activeNode, 
+  camera, 
+  controls,
+  mode = '2d'
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const minimapCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const minimapControlsRef = useRef<OrbitControls | null>(null);
+  const [is3D, setIs3D] = useState(mode === '3d');
+  const [isDragging, setIsDragging] = useState(false);
 
-  const renderer = new THREE.WebGLRenderer({ 
-    antialias: true,
-    alpha: true
-  });
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(192, 144);
-  container.appendChild(renderer.domElement);
+  // Initialize 3D scene
+  useEffect(() => {
+    if (!containerRef.current || !is3D) return;
 
-  const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
-  minimapCamera.position.set(0, 15, 15);
-  minimapCamera.lookAt(0, 0, 0);
+    const { scene, renderer, camera, controls, cleanup } = setup3DScene(
+      containerRef.current,
+      (controls) => {
+        minimapControlsRef.current = controls;
+      }
+    );
 
-  const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
-  minimapControls.enableDamping = true;
-  minimapControls.dampingFactor = 0.05;
-  minimapControls.rotateSpeed = 0.5;
-  minimapControls.zoomSpeed = 0.5;
-  onControlsRef(minimapControls);
+    sceneRef.current = scene;
+    rendererRef.current = renderer;
+    minimapCameraRef.current = camera;
 
-  return {
-    scene,
-    renderer,
-    camera: minimapCamera,
-    controls: minimapControls,
-    cleanup: () => {
-      minimapControls.dispose();
-      renderer.dispose();
-      container.removeChild(renderer.domElement);
-    }
-  };
-};
+    return cleanup;
+  }, [is3D]);
 
-export const update3DScene = (
-  scene: THREE.Scene,
-  nodes: MinimapProps['nodes'],
-  edges: MinimapProps['edges'],
-  nodePositions: MinimapProps['nodePositions'],
-  activeNode: MinimapProps['activeNode'],
-  camera?: THREE.Camera,
-  controls?: OrbitControls
-) => {
-  while(scene.children.length > 0) {
-    scene.remove(scene.children[0]);
-  }
+  // Setup 2D canvas
+  useEffect(() => {
+    if (!canvasRef.current || is3D) return;
+    setup2DCanvas(canvasRef.current);
+  }, [is3D]);
 
-  // Add nodes
-  nodes.forEach(node => {
-    const position = nodePositions.get(node.id);
-    if (!position) return;
+  // Update 3D scene content
+  useEffect(() => {
+    if (!sceneRef.current || !is3D) return;
+    return update3DScene(
+      sceneRef.current,
+      nodes,
+      edges,
+      nodePositions,
+      activeNode,
+      camera,
+      controls
+    );
+  }, [nodes, edges, nodePositions, activeNode, camera, controls, is3D]);
 
-    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
-    const material = new THREE.MeshBasicMaterial({ 
-      color: getNodeColor(node, activeNode)
-    });
-    const sphere = new THREE.Mesh(geometry, material);
-    sphere.position.set(...position);
-    
-    if (node.id === activeNode) {
-      const glowGeometry = new THREE.SphereGeometry(0.4, 16, 16);
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color: '#ffffff',
-        transparent: true,
-        opacity: 0.3
-      });
-      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-      sphere.add(glow);
-    }
-    
-    scene.add(sphere);
-  });
+  // Animation loop
+  useEffect(() => {
+    let animationFrame: number;
 
-  // Add edges with glow effect
-  edges.forEach(edge => {
-    const startPos = nodePositions.get(edge.source);
-    const endPos = nodePositions.get(edge.target);
-    
-    if (!startPos || !endPos) return;
-
-    const points = [
-      new THREE.Vector3(...startPos),
-      new THREE.Vector3(...endPos)
-    ];
-    
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    
-    const material = new THREE.LineBasicMaterial({ 
-      color: '#4b5563',
-      transparent: true,
-      opacity: 0.6
-    });
-    const line = new THREE.Line(geometry, material);
-    scene.add(line);
-
-    const glowMaterial = new THREE.LineBasicMaterial({
-      color: '#6b7280',
-      transparent: true,
-      opacity: 0.2,
-      linewidth: 2
-    });
-    const glowLine = new THREE.Line(geometry, glowMaterial);
-    scene.add(glowLine);
-  });
-
-  if (camera) {
-    const frustumGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({
-      color: '#ffffff',
-      opacity: 0.2,
-      transparent: true,
-      wireframe: true
-    });
-    
-    const frustumMesh = new THREE.Mesh(frustumGeometry, material);
-    scene.add(frustumMesh);
-
-    const updateFrustum = () => {
-      const frustum = new THREE.Frustum();
-      const projScreenMatrix = new THREE.Matrix4();
-      projScreenMatrix.multiplyMatrices(
-        camera.projectionMatrix,
-        camera.matrixWorldInverse
-      );
-      frustum.setFromProjectionMatrix(projScreenMatrix);
-
-      frustumMesh.position.copy(camera.position);
-      frustumMesh.quaternion.copy(camera.quaternion);
-      
-      const scale = camera.position.length() * 0.2;
-      frustumMesh.scale.set(scale, scale, scale);
+    const animate = () => {
+      if (is3D) {
+        if (minimapControlsRef.current) {
+          minimapControlsRef.current.update();
+        }
+        if (rendererRef.current && sceneRef.current && minimapCameraRef.current) {
+          rendererRef.current.render(sceneRef.current, minimapCameraRef.current);
+        }
+      } else {
+        if (canvasRef.current) {
+          render2D(canvasRef.current, nodes, edges, nodePositions, activeNode, camera);
+        }
+      }
+      animationFrame = requestAnimationFrame(animate);
     };
 
-    if (controls) {
-      controls.addEventListener('change', updateFrustum);
-      return () => controls.removeEventListener('change', updateFrustum);
-    }
-  }
+    animate();
+    return () => cancelAnimationFrame(animationFrame);
+  }, [is3D, nodes, edges, nodePositions, activeNode, camera]);
+
+  // Handle camera movement
+  useEffect(() => {
+    if (!camera || !controls) return;
+
+    const handleCameraChange = () => {
+      if (!is3D && canvasRef.current) {
+        render2D(canvasRef.current, nodes, edges, nodePositions, activeNode, camera);
+      }
+    };
+
+    controls.addEventListener('change', handleCameraChange);
+    return () => controls.removeEventListener('change', handleCameraChange);
+  }, [camera, controls, is3D, nodes, edges, nodePositions, activeNode]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+      animate={{ opacity: 0.95, scale: 1, y: 0 }}
+      transition={{ duration: 0.3, type: "spring", stiffness: 260, damping: 20 }}
+      className="absolute bottom-4 right-4 z-50"
+    >
+      <Card className="w-48 h-36 overflow-hidden shadow-xl">
+        <div className="relative w-full h-full bg-gray-900/90 backdrop-blur-md">
+          {is3D ? (
+            <div 
+              ref={containerRef} 
+              className="w-full h-full"
+              style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+              onMouseDown={() => setIsDragging(true)}
+              onMouseUp={() => setIsDragging(false)}
+              onMouseLeave={() => setIsDragging(false)}
+            />
+          ) : (
+            <canvas
+              ref={canvasRef}
+              className="w-full h-full"
+              style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+              onMouseDown={() => setIsDragging(true)}
+              onMouseUp={() => setIsDragging(false)}
+              onMouseLeave={() => setIsDragging(false)}
+            />
+          )}
+          <button
+            onClick={() => setIs3D(!is3D)}
+            className="absolute top-2 right-2 p-1 rounded-md bg-gray-800/80 hover:bg-gray-700/80 transition-colors text-white text-sm"
+          >
+            {is3D ? 'Switch to 2D' : 'Switch to 3D'}
+          </button>
+        </div>
+      </Card>
+    </motion.div>
+  );
 };
+
+export default Minimap;
