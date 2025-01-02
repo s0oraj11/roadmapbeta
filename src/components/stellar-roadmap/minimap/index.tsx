@@ -53,7 +53,7 @@ useEffect(() => {
   rendererRef.current = renderer;
 
   // Create and configure camera with closer view
-  const minimapCamera = new THREE.PerspectiveCamera(60, 192/144, 0.1, 1000);
+  const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
   minimapCamera.position.set(0, 4, 4);
   minimapCamera.lookAt(0, 0, 0);
   minimapCameraRef.current = minimapCamera;
@@ -96,13 +96,42 @@ useEffect(() => {
   if (!minimapCameraRef.current || !minimapControlsRef.current || !is3D) return;
 
   // Set initial zoom level
-  minimapCameraRef.current.position.set(0, 4, 4);
+  minimapCameraRef.current.position.set(0, 2, 2);
   minimapCameraRef.current.lookAt(0, 0, 0);
   minimapControlsRef.current.update();
 
 }, [is3D]);
 
+// Add the new camera fitting useEffect here
+useEffect(() => {
+  if (!minimapCameraRef.current || !sceneRef.current || !is3D || !minimapControlsRef.current) return;
 
+  // Calculate bounding box of all objects
+  const box = new THREE.Box3();
+  sceneRef.current.traverse((object) => {
+    if (object.type === "Mesh") {
+      box.expandByObject(object);
+    }
+  });
+
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+  // Position camera to frame the content
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = minimapCameraRef.current.fov * (Math.PI / 180);
+  const distance = maxDim / (2 * Math.tan(fov / 2));
+
+  minimapCameraRef.current.position.set(
+    center.x,
+    center.y + distance * 0.5,
+    center.z + distance * 0.5
+  );
+  minimapCameraRef.current.lookAt(center);
+  minimapControlsRef.current.update();
+}, [is3D, nodes]);
   
   // Setup 2D canvas
   useEffect(() => {
