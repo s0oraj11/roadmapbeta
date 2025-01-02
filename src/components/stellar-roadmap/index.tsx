@@ -22,25 +22,26 @@ interface StellarRoadmapProps {
 }
 
 
+
+
+
+
 const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Camera) => void }) => {
   const { camera, scene } = useThree()
   const hasInitialized = useRef(false)
-  const [isReady, setIsReady] = useState(false)
   
+  // Function to calculate optimal camera position
   const calculateOptimalView = useCallback(() => {
     const box = new THREE.Box3().setFromObject(scene)
     const size = box.getSize(new THREE.Vector3())
     const center = box.getCenter(new THREE.Vector3())
 
+    // Calculate optimal distance based on scene size and aspect ratio
+    const maxDimension = Math.max(size.x, size.y, size.z)
     const fov = camera.fov * (Math.PI / 180)
-    const aspect = window.innerWidth / window.innerHeight
     
-    const horizontalFit = size.x / (Math.tan(fov / 2) * aspect)
-    const verticalFit = size.y / Math.tan(fov / 2)
-    let distance = Math.max(horizontalFit, verticalFit)
-    
-    const initialZoomFactor = 0.4
-    distance *= initialZoomFactor
+    // Using 0.6 factor to bring camera closer
+    const distance = (maxDimension / 2) / Math.tan(fov / 2) * 0.3
     
     return {
       position: new THREE.Vector3(
@@ -52,80 +53,63 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
     }
   }, [camera.fov, scene])
 
+  // Handle initial camera setup
   useEffect(() => {
     if (!hasInitialized.current) {
-      const timer = setTimeout(() => {
+      // Wait for scene to be ready
+      requestAnimationFrame(() => {
         const { position, target } = calculateOptimalView()
         
+        // Set initial camera position
         camera.position.copy(position)
         camera.lookAt(target)
         camera.updateProjectionMatrix()
         
+        // Mark as initialized
         hasInitialized.current = true
-        setIsReady(true)
         onCameraReady(camera)
-      }, 100)
-      
-      return () => clearTimeout(timer)
+      })
     }
   }, [camera, calculateOptimalView, onCameraReady])
 
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      if (hasInitialized.current && isReady) {
+      if (hasInitialized.current) {
         const { position, target } = calculateOptimalView()
-        
-        const duration = 1000
-        const startPosition = camera.position.clone()
-        const startTime = Date.now()
-        
-        const animate = () => {
-          const now = Date.now()
-          const progress = Math.min((now - startTime) / duration, 1)
-          const eased = 1 - Math.pow(1 - progress, 3)
-          
-          camera.position.lerpVectors(startPosition, position, eased)
-          camera.lookAt(target)
-          camera.updateProjectionMatrix()
-          
-          if (progress < 1) {
-            requestAnimationFrame(animate)
-          }
-        }
-        
-        animate()
+        camera.position.lerp(position, 0.5)
+        camera.lookAt(target)
+        camera.updateProjectionMatrix()
       }
     }
 
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [camera, calculateOptimalView, isReady])
+  }, [camera, calculateOptimalView])
 
+  // Handle scene changes
   useEffect(() => {
-    if (!scene.el) return
-
     const observer = new MutationObserver(() => {
-      if (hasInitialized.current && isReady) {
+      if (hasInitialized.current) {
         const { position, target } = calculateOptimalView()
-        
         camera.position.lerp(position, 0.3)
         camera.lookAt(target)
         camera.updateProjectionMatrix()
       }
     })
 
-    observer.observe(scene.el, { 
-      childList: true, 
-      subtree: true 
-    })
+    if (scene.el) {
+      observer.observe(scene.el, { 
+        childList: true, 
+        subtree: true 
+      })
+    }
 
     return () => observer.disconnect()
-  }, [scene, camera, calculateOptimalView, isReady])
+  }, [scene, camera, calculateOptimalView])
 
   return null
 }
-
-
 
 
 
