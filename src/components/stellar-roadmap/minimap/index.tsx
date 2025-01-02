@@ -27,112 +27,23 @@ const Minimap: React.FC<MinimapProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   // Initialize 3D scene
-useEffect(() => {
-  if (!containerRef.current || !is3D) return;
+  useEffect(() => {
+    if (!containerRef.current || !is3D) return;
 
-  // Create scene
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#0f172a');
-  sceneRef.current = scene;
+    const { scene, renderer, camera, controls, cleanup } = setup3DScene(
+      containerRef.current,
+      (controls) => {
+        minimapControlsRef.current = controls;
+      }
+    );
 
-  // Create renderer
-  const renderer = new THREE.WebGLRenderer({ 
-    antialias: true,
-    alpha: true,
-    powerPreference: "high-performance"
-  });
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(192, 144);
-  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.5;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    sceneRef.current = scene;
+    rendererRef.current = renderer;
+    minimapCameraRef.current = camera;
 
-  containerRef.current.appendChild(renderer.domElement);
-  rendererRef.current = renderer;
+    return cleanup;
+  }, [is3D]);
 
-  // Create and configure camera with closer view
-  const minimapCamera = new THREE.PerspectiveCamera(75, 192/144, 0.1, 1000);
-  minimapCamera.position.set(0, 4, 4);
-  minimapCamera.lookAt(0, 0, 0);
-  minimapCameraRef.current = minimapCamera;
-
-  // Create and configure controls with limits
-  const minimapControls = new OrbitControls(minimapCamera, renderer.domElement);
-  minimapControls.enableDamping = true;
-  minimapControls.dampingFactor = 0.05;
-  minimapControls.rotateSpeed = 0.5;
-  minimapControls.zoomSpeed = 0.5;
-  minimapControls.minDistance = 4;
-  minimapControls.maxDistance = 20;
-  minimapControls.maxPolarAngle = Math.PI / 2;
-  minimapControlsRef.current = minimapControls;
-
-  // Add lights
-  const ambientLight = new THREE.AmbientLight('#ffffff', 0.4);
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight('#ffffff', 1.0);
-  directionalLight.position.set(5, 10, 5);
-  scene.add(directionalLight);
-
-  const hemisphereLight = new THREE.HemisphereLight('#ffffff', '#004d99', 0.6);
-  scene.add(hemisphereLight);
-
-  return () => {
-    minimapControls.dispose();
-    renderer.dispose();
-    if (containerRef.current) {
-      containerRef.current.removeChild(renderer.domElement);
-    }
-    scene.remove(ambientLight);
-    scene.remove(directionalLight);
-    scene.remove(hemisphereLight);
-  };
-}, [is3D]);
-//setting the initial view
-useEffect(() => {
-  if (!minimapCameraRef.current || !minimapControlsRef.current || !is3D) return;
-
-  // Set initial zoom level
-  minimapCameraRef.current.position.set(0, 2, 2);
-  minimapCameraRef.current.lookAt(0, 0, 0);
-  minimapControlsRef.current.update();
-
-}, [is3D]);
-
-// Add the new camera fitting useEffect here
-useEffect(() => {
-  if (!minimapCameraRef.current || !sceneRef.current || !is3D || !minimapControlsRef.current) return;
-
-  // Calculate bounding box of all objects
-  const box = new THREE.Box3();
-  sceneRef.current.traverse((object) => {
-    if (object.type === "Mesh") {
-      box.expandByObject(object);
-    }
-  });
-
-  const center = new THREE.Vector3();
-  box.getCenter(center);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-
-  // Position camera to frame the content
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const fov = minimapCameraRef.current.fov * (Math.PI / 180);
-  const distance = maxDim / (2 * Math.tan(fov / 2));
-
-  minimapCameraRef.current.position.set(
-    center.x,
-    center.y + distance * 0.5,
-    center.z + distance * 0.5
-  );
-  minimapCameraRef.current.lookAt(center);
-  minimapControlsRef.current.update();
-}, [is3D, nodes]);
-  
   // Setup 2D canvas
   useEffect(() => {
     if (!canvasRef.current || is3D) return;
@@ -223,7 +134,7 @@ useEffect(() => {
             onClick={() => setIs3D(!is3D)}
             className="absolute top-2 right-2 p-1 rounded-md bg-gray-800/80 hover:bg-gray-700/80 transition-colors text-white text-sm"
           >
-            {is3D ? 'View 2D' : 'View 3D'}
+            {is3D ? 'Switch to 2D' : 'Switch to 3D'}
           </button>
         </div>
       </Card>
