@@ -48,7 +48,7 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
         center.x,
         center.y - distance * 0.2 //center.y + distance * 0.1,
         center.z + distance
-      )
+      ),
       target: new THREE.Vector3 (
       center.x,
       center.y - distance * 0.2, // Add this line to move the look-at target, previous target: center
