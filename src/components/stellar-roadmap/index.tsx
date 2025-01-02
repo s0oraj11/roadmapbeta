@@ -40,8 +40,8 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
     const maxDimension = Math.max(size.x, size.y, size.z)
     const fov = camera.fov * (Math.PI / 180)
     
-    // Using 0.6 factor to bring camera closer
-    const distance = (maxDimension / 2) / Math.tan(fov / 2) * 0.3
+    // reudce the multipler for initial zoom to move closer to graph, increase to go far 
+    const distance = (maxDimension / 2) / Math.tan(fov / 2) * 0.15
     
     return {
       position: new THREE.Vector3(
