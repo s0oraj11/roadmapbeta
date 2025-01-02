@@ -66,13 +66,13 @@ export const render2D = (
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
-      // Add very subtle directional animation for edges connected to active node
+      // Add subtle directional animation for edges connected to active node
       if (edge.source === activeNode || edge.target === activeNode) {
         ctx.shadowColor = 'rgba(71, 85, 105, 0.3)';
         ctx.shadowBlur = 2;
         ctx.strokeStyle = 'rgba(107, 114, 128, 0.4)';
         ctx.setLineDash([3, 6]);
-        ctx.lineDashOffset = -Date.now() / 150; // Slower animation
+        ctx.lineDashOffset = -Date.now() / 150;
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
@@ -103,42 +103,20 @@ export const render2D = (
     ctx.fill();
     
     if (node.id === activeNode) {
-      // Draw main node highlight
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       ctx.stroke();
-
-      // Draw subtle directional split lines around active node
-      const radius = 12; // Radius for split lines
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 4]);
-      ctx.lineDashOffset = Date.now() / 200; // Slower rotation
-
-      // Draw split lines in a cross pattern
-      for (let i = 0; i < 4; i++) {
-        const angle = (Math.PI / 2) * i + (Date.now() / 2000); // Slow rotation
-        ctx.beginPath();
-        ctx.moveTo(
-          x + Math.cos(angle) * radius,
-          y + Math.sin(angle) * radius
-        );
-        ctx.lineTo(
-          x + Math.cos(angle + Math.PI) * radius,
-          y + Math.sin(angle + Math.PI) * radius
-        );
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
     }
   });
 
-  // Draw viewport with moving split lines (more prominent)
+  // Draw viewport with moving split lines
   if (camera) {
     const viewportPoints = getViewportPoints(camera);
     const projectedPoints = viewportPoints.map(point => 
       project([point.x, point.y, point.z])
     );
+    
+    // Fill viewport area
     ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.beginPath();
     ctx.moveTo(projectedPoints[0][0], projectedPoints[0][1]);
@@ -147,12 +125,13 @@ export const render2D = (
     });
     ctx.closePath();
     ctx.fill();
+    
+    // Draw animated viewport border
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 4]);
     ctx.lineDashOffset = (Date.now() / 50) % 8;
     ctx.stroke();
-    
     ctx.setLineDash([]);
   }
 };
