@@ -39,7 +39,7 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
     const fov = camera.fov * (Math.PI / 180)
     
     // Add padding factor for consistent spacing
-    const paddingFactor = 1.2
+    const paddingFactor = 0.8
     
     // Calculate base distance needed to fit scene
     let distance = (maxDimension / 2) / Math.tan(fov / 2) * paddingFactor
@@ -47,13 +47,13 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
     // Adjust for aspect ratio
     if (aspectRatio < 1) {
       // Mobile/portrait: need more distance to fit width
-      distance *= (1 + (1 - aspectRatio))
+      distance *= (1 + (1 - aspectRatio) * 0.5)
     }
     
     // Ensure distance is within bounds
     distance = Math.max(
       Math.min(distance, CAMERA_SETTINGS.MAX_DISTANCE * 0.5),
-      CAMERA_SETTINGS.MIN_DISTANCE * 2
+      CAMERA_SETTINGS.MIN_DISTANCE * 1.5
     )
     
     return { center, distance }
@@ -68,7 +68,7 @@ const CameraController = ({ onCameraReady }: { onCameraReady: (camera: THREE.Cam
         // Position camera for top-down view with slight angle
         camera.position.set(
           center.x,
-          center.y + distance * 0.3, // Add elevation for perspective
+          center.y + distance * 0.2, // Add elevation for perspective
           center.z + distance
         )
         
