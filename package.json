@@ -8,11 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "ui:add": "npx shadcn-ui@latest add"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@react-three/drei": "^9.120.4",
+    "@react-three/drei": "^9.120.4" ,
     "@react-three/fiber": "8.2.2",
     "framer-motion-3d": "^11.15.0",
     "@types/three": "^0.161.2",
@@ -89,7 +88,6 @@
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1",
-    "shadcn-ui": "^0.8.0"
+    "vite": "^5.4.1"
   }
 }
